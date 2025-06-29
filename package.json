@@ -2,6 +2,7 @@
   "name": "plushies",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite --port 3000 --host",
@@ -16,10 +17,15 @@
     "@tanstack/react-router": "^1.121.27",
     "@tanstack/react-router-devtools": "^1.121.27",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
     "@tanstack/router-plugin": "^1.121.29",
+    "@types/node": "^24.0.3",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
