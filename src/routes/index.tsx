@@ -1,9 +1,9 @@
-import { Button } from '@/components/ui/button'
-import { createFileRoute } from '@tanstack/react-router'
+import { Button } from "@/components/ui/button";
+import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   component: Index,
-})
+});
 
 function Index() {
   return (
@@ -11,5 +11,5 @@ function Index() {
       <h3 className="text-3xl font-bold underline">Welcome Home!</h3>
       <Button>Click ME</Button>
     </div>
-  )
+  );
 }
