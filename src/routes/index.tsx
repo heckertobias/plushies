@@ -1,5 +1,4 @@
 import SummaryCard from "@/components/summaryCard";
-import { Button } from "@/components/ui/button";
 import { createFileRoute } from "@tanstack/react-router";
 import dayjs from "dayjs";
 
@@ -9,7 +8,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <div>
+    <div className="p-6">
       <SummaryCard
         name={"Plushie Cute"}
         birthday={dayjs("2024-05-01")}

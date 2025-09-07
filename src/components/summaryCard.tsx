@@ -1,6 +1,7 @@
 import type { Dayjs } from "dayjs";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
 
 type DivProps = React.ComponentProps<"div">;
 
@@ -24,8 +25,8 @@ export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Summ
   const initials = avatarInitials(name);
 
   return (
-    <div onClick={onClick} className={"shrink-0 h-24 group block"}>
-      <div className="flex items-top h-full">
+    <Card onClick={onClick} className="w-fit hover:bg-accent hover:cursor-pointer">
+      <CardContent className="flex items-top h-24">
         <Avatar className="h-full aspect-square rounded-lg size-auto">
           <AvatarImage src={avatarUrl} />
           <AvatarFallback>{initials ?? "?"}</AvatarFallback>
@@ -34,7 +35,7 @@ export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Summ
           <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">{name}</h3>
           <p className="text-muted-foreground text-xl">{birthday.format("L")}</p>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
