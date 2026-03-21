@@ -5,6 +5,12 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
+  server: {
+    proxy: {
+      "/api": "http://localhost:3001",
+      "/uploads": "http://localhost:3001",
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
