@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { Plushie } from "@/lib/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import PhotoUpload from "@/components/photoUpload";
+import DatePicker from "@/components/datePicker";
 
 type PlushieInput = {
   name: string;
@@ -39,7 +41,8 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [birthday, setBirthday] = useState(plushie?.birthday ?? "");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,7 +51,7 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
 
     const input: PlushieInput = {
       name: data.get("name") as string,
-      birthday: data.get("birthday") as string,
+      birthday,
       origin: (data.get("origin") as string) || undefined,
       notes: (data.get("notes") as string) || undefined,
     };
@@ -67,7 +70,6 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
             body: JSON.stringify(input),
           });
 
-      const photo = photoRef.current?.files?.[0];
       if (photo) {
         const form = new FormData();
         form.append("photo", photo);
@@ -109,8 +111,8 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="birthday">Geburtstag *</Label>
-            <Input id="birthday" name="birthday" type="date" required defaultValue={plushie?.birthday} />
+            <Label>Geburtstag *</Label>
+            <DatePicker value={birthday} onChange={setBirthday} />
           </div>
 
           <div className="space-y-1">
@@ -124,8 +126,11 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="photo">Foto</Label>
-            <Input id="photo" name="photo" type="file" accept="image/*" ref={photoRef} />
+            <Label>Foto</Label>
+            <PhotoUpload
+              currentPhotoUrl={plushie?.photoPath ? `/api/uploads/${plushie.photoPath.split("/").pop()}` : undefined}
+              onChange={setPhoto}
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -136,6 +141,9 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
                 {deleting ? "Löschen…" : "Löschen"}
               </Button>
             )}
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving || deleting}>
+              Abbrechen
+            </Button>
             <Button type="submit" disabled={saving || deleting}>
               {saving ? "Speichern…" : "Speichern"}
             </Button>
