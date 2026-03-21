@@ -32,7 +32,9 @@ export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Summ
           <AvatarFallback>{initials ?? "?"}</AvatarFallback>
         </Avatar>
         <div className="ms-3">
-          <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">{name}</h3>
+          <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight whitespace-nowrap">
+            {name}
+          </h3>
           <p className="text-muted-foreground text-xl">{birthday.format("L")}</p>
         </div>
       </CardContent>
