@@ -5,13 +5,19 @@ import { Camera, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
+// "delete" = bestehendes Server-Foto soll gelöscht werden
+// File     = neues Foto hochladen
+// null     = keine Änderung
+export type PhotoChange = File | "delete" | null;
+
 type Props = {
   currentPhotoUrl?: string;
-  onChange: (file: File | null) => void;
+  onChange: (value: PhotoChange) => void;
 };
 
 export default function PhotoUpload({ currentPhotoUrl, onChange }: Props) {
   const [preview, setPreview] = useState<string | null>(currentPhotoUrl ?? null);
+  const [isExisting, setIsExisting] = useState(!!currentPhotoUrl);
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -19,6 +25,7 @@ export default function PhotoUpload({ currentPhotoUrl, onChange }: Props) {
   function handleFile(file: File) {
     if (!file.type.startsWith("image/")) return;
     setPreview(URL.createObjectURL(file));
+    setIsExisting(false);
     onChange(file);
   }
 
@@ -37,14 +44,15 @@ export default function PhotoUpload({ currentPhotoUrl, onChange }: Props) {
   function handleRemove(e: React.MouseEvent) {
     e.stopPropagation();
     setPreview(null);
-    onChange(null);
     if (fileRef.current) fileRef.current.value = "";
     if (cameraRef.current) cameraRef.current.value = "";
+    // Bestehendes Server-Foto → explizit löschen; neue Auswahl → einfach zurücksetzen
+    onChange(isExisting ? "delete" : null);
+    setIsExisting(false);
   }
 
   return (
     <div className="space-y-2">
-      {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
@@ -78,12 +86,9 @@ export default function PhotoUpload({ currentPhotoUrl, onChange }: Props) {
         )}
       </div>
 
-      {/* Hidden inputs */}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleInputChange} />
-      {/* capture="environment" öffnet auf Mobile direkt die Rückkamera */}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleInputChange} />
 
-      {/* Kamera-Button – nur auf Touch-Geräten sichtbar */}
       <Button
         type="button"
         variant="outline"

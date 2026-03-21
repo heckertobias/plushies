@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import PhotoUpload from "@/components/photoUpload";
+import PhotoUpload, { type PhotoChange } from "@/components/photoUpload";
 import DatePicker from "@/components/datePicker";
 
 type PlushieInput = {
@@ -41,7 +41,7 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [photo, setPhoto] = useState<PhotoChange>(null);
   const [birthday, setBirthday] = useState(plushie?.birthday ?? "");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -70,7 +70,9 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
             body: JSON.stringify(input),
           });
 
-      if (photo) {
+      if (photo === "delete") {
+        await fetch(`/api/plushies/${saved.id}/photo`, { method: "DELETE" });
+      } else if (photo instanceof File) {
         const form = new FormData();
         form.append("photo", photo);
         await fetch(`/api/plushies/${saved.id}/photo`, { method: "POST", body: form });

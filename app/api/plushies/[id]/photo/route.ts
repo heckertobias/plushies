@@ -30,3 +30,20 @@ export async function POST(request: Request, { params }: Params) {
 
   return NextResponse.json({ photoUrl: storage.publicUrl(savedPath) });
 }
+
+export async function DELETE(_request: Request, { params }: Params) {
+  const { id } = await params;
+  const numId = Number(id);
+
+  const [existing] = await db.select().from(plushies).where(eq(plushies.id, numId));
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (existing.photoPath) await storage.delete(existing.photoPath);
+
+  await db
+    .update(plushies)
+    .set({ photoPath: null, updatedAt: new Date().toISOString() })
+    .where(eq(plushies.id, numId));
+
+  return new NextResponse(null, { status: 204 });
+}
