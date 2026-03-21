@@ -1,46 +1,11 @@
 {
   "name": "plushies",
-  "version": "1.0.0",
-  "description": "",
-  "type": "module",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "dev": "vite --port 3000 --host",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.12.1",
-  "dependencies": {
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@tanstack/react-router": "^1.131.35",
-    "@tanstack/react-router-devtools": "^1.131.35",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "dayjs": "^1.11.18",
-    "lucide-react": "^0.525.0",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "tailwind-merge": "^3.3.1",
-    "tailwindcss": "^4.1.13",
-    "tw-animate-css": "^1.3.8"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.13",
-    "@tanstack/router-plugin": "^1.131.35",
-    "@types/node": "^24.3.1",
-    "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9",
-    "@vitejs/plugin-react": "^4.7.0",
-    "eslint": "^9.35.0",
-    "eslint-config-airbnb": "^19.0.4",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "prettier": "^3.6.2",
-    "typescript": "^5.9.2",
-    "vite": "^6.3.5"
+    "dev:client": "pnpm --filter client dev",
+    "dev:server": "pnpm --filter server dev",
+    "build": "pnpm --filter client build",
+    "typecheck": "pnpm --filter client typecheck && pnpm --filter server typecheck",
+    "lint": "pnpm --filter client lint"
   }
 }
