@@ -82,11 +82,11 @@ plushiesRouter.post("/:id/photo", async (c) => {
   if (existing.photoPath) await storage.delete(existing.photoPath);
   const savedPath = await storage.save(file, filename);
 
-  const [updated] = await db
+  const updated = await db
     .update(plushies)
     .set({ photoPath: savedPath, updatedAt: new Date().toISOString() })
     .where(eq(plushies.id, id))
     .returning();
 
-  return c.json({ photoUrl: storage.publicUrl(updated.photoPath!) });
+  return c.json({ photoUrl: storage.publicUrl(savedPath) });
 });
