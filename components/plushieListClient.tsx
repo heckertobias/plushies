@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { GROUP_ORDER, type GroupedPlushies } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import dayjs from "dayjs";
@@ -56,7 +56,18 @@ export default function PlushieListClient({ groups }: Props) {
                       name={p.name}
                       birthday={dayjs(p.birthday).format("DD.MM.YYYY")}
                       avatarUrl={p.photoPath ? `/api/uploads/${p.photoPath.split("/").pop()}` : undefined}
-                      onClick={() => { setSelected(p); setFormOpen(true); }}
+                      origin={p.origin}
+                      notes={p.notes}
+                      editButton={
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setSelected(p); setFormOpen(true); }}
+                          className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
+                          aria-label="Bearbeiten"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      }
                     />
                   ))}
                 </div>
@@ -67,6 +78,7 @@ export default function PlushieListClient({ groups }: Props) {
       </div>
 
       <PlushieForm
+        key={selected?.id ?? "new"}
         open={formOpen}
         onClose={() => { setFormOpen(false); setSelected(undefined); }}
         onSaved={handleSaved}
