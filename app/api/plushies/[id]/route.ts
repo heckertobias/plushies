@@ -15,12 +15,12 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;
-  const body = await request.json() as {
-    name?: string;
-    birthday?: string;
-    origin?: string;
-    notes?: string;
-  };
+  let body: { name?: string; birthday?: string; origin?: string; notes?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Ungültige Anfrage" }, { status: 400 });
+  }
   const [updated] = await db
     .update(plushies)
     .set({ ...body, updatedAt: new Date().toISOString() })

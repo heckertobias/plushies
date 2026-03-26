@@ -9,6 +9,7 @@ import { Plus, Pencil } from "lucide-react";
 import { GROUP_ORDER, type GroupedPlushies } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import dayjs from "dayjs";
+import { photoUrl } from "@/lib/utils";
 
 type Props = { groups: GroupedPlushies };
 
@@ -55,7 +56,7 @@ export default function PlushieListClient({ groups }: Props) {
                       key={p.id}
                       name={p.name}
                       birthday={dayjs(p.birthday).format("DD.MM.YYYY")}
-                      avatarUrl={p.photoPath ? `/api/uploads/${p.photoPath.split("/").pop()}` : undefined}
+                      avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
                       origin={p.origin}
                       notes={p.notes}
                       editButton={

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Camera, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 // "delete" = bestehendes Server-Foto soll gelöscht werden
 // File     = neues Foto hochladen
@@ -15,16 +16,32 @@ type Props = {
   onChange: (value: PhotoChange) => void;
 };
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 export default function PhotoUpload({ currentPhotoUrl, onChange }: Props) {
   const [preview, setPreview] = useState<string | null>(currentPhotoUrl ?? null);
   const [isExisting, setIsExisting] = useState(!!currentPhotoUrl);
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    };
+  }, []);
 
   function handleFile(file: File) {
     if (!file.type.startsWith("image/")) return;
-    setPreview(URL.createObjectURL(file));
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("Foto zu groß (max. 10 MB)");
+      return;
+    }
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    const url = URL.createObjectURL(file);
+    blobUrlRef.current = url;
+    setPreview(url);
     setIsExisting(false);
     onChange(file);
   }

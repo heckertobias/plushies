@@ -16,6 +16,7 @@ export async function POST(request: Request, { params }: Params) {
   const formData = await request.formData();
   const file = formData.get("photo");
   if (!(file instanceof File)) return NextResponse.json({ error: "No photo provided" }, { status: 400 });
+  if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Foto zu groß (max. 10 MB)" }, { status: 413 });
 
   const ext = file.name.split(".").pop() ?? "jpg";
   const filename = `${numId}-${Date.now()}.${ext}`;
