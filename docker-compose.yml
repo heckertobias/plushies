@@ -9,6 +9,9 @@ services:
     environment:
       - DATABASE_URL=file:/data/plushies.db
       - UPLOADS_DIR=/uploads
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ICAL_TOKEN=${ICAL_TOKEN}
     restart: unless-stopped
 
 volumes:
