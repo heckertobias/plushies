@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - plushies_db:/data
+      - plushies_uploads:/uploads
+    environment:
+      - DATABASE_URL=file:/data/plushies.db
+      - UPLOADS_DIR=/uploads
+    restart: unless-stopped
+
+volumes:
+  plushies_db:
+  plushies_uploads:
