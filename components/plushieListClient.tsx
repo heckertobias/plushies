@@ -6,10 +6,20 @@ import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil } from "lucide-react";
-import { GROUP_ORDER, type GroupedPlushies } from "@/lib/groupPlushies";
+import { GROUP_ORDER, nextBirthday, type GroupedPlushies } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import dayjs from "dayjs";
 import { photoUrl } from "@/lib/utils";
+
+function birthdayLabel(rawDate: string): string {
+  const today = dayjs().startOf("day");
+  const next = nextBirthday(rawDate, today);
+  const diff = next.diff(today, "day");
+  if (diff === 0) return "🎂 Heute!";
+  if (diff === 1) return "🎂 Morgen";
+  if (diff <= 30) return `🎂 in ${diff} Tagen`;
+  return `🎂 ${next.format("DD.MM.")}`;
+}
 
 type Props = { groups: GroupedPlushies };
 
@@ -31,8 +41,8 @@ export default function PlushieListClient({ groups }: Props) {
 
   return (
     <>
-      <div className="p-6 space-y-8">
-        <div className="flex justify-end">
+      <div className="max-w-2xl mx-auto px-6 py-6 space-y-8">
+        <div className="hidden sm:flex justify-end">
           <Button onClick={() => { setSelected(undefined); setFormOpen(true); }} size="sm">
             <Plus className="h-4 w-4" />
             Neu
@@ -40,14 +50,17 @@ export default function PlushieListClient({ groups }: Props) {
         </div>
 
         {isEmpty ? (
-          <p className="text-muted-foreground">Noch keine Plüschtiere angelegt.</p>
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className="text-5xl">🧸</span>
+            <p className="text-muted-foreground">Noch keine Plüschtiere angelegt.<br />Leg gleich los!</p>
+          </div>
         ) : (
           GROUP_ORDER.map((group) => {
             const items = groups[group];
             if (items.length === 0) return null;
             return (
               <section key={group}>
-                <h2 className="text-lg font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
+                <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-widest">
                   {group}
                 </h2>
                 <div className="flex flex-col gap-3">
@@ -55,7 +68,7 @@ export default function PlushieListClient({ groups }: Props) {
                     <SummaryCard
                       key={p.id}
                       name={p.name}
-                      birthday={dayjs(p.birthday).format("DD.MM.YYYY")}
+                      birthday={birthdayLabel(p.birthday)}
                       avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
                       origin={p.origin}
                       notes={p.notes}
@@ -77,6 +90,16 @@ export default function PlushieListClient({ groups }: Props) {
           })
         )}
       </div>
+
+      {/* Floating action button — mobile only */}
+      <Button
+        onClick={() => { setSelected(undefined); setFormOpen(true); }}
+        size="icon"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg sm:hidden"
+        aria-label="Neues Plüschtier"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       <PlushieForm
         key={selected?.id ?? "new"}

@@ -13,7 +13,7 @@ export const GROUP_ORDER: Group[] = [
   "Später",
 ];
 
-function nextBirthday(birthday: string, today: Dayjs): Dayjs {
+export function nextBirthday(birthday: string, today: Dayjs): Dayjs {
   const [, month, day] = birthday.split("-").map(Number);
   const thisYear = today.year();
   const candidate = dayjs(new Date(thisYear, (month ?? 1) - 1, day ?? 1));
