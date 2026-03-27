@@ -85,6 +85,8 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
         form.append("photo", photo);
         const res = await fetch(`/api/plushies/${saved.id}/photo`, { method: "POST", body: form });
         if (!res.ok) {
+          // Neu angelegtes Plüschtier wieder löschen damit kein verwaister Eintrag entsteht
+          if (!isEdit) await fetch(`/api/plushies/${saved.id}`, { method: "DELETE" });
           const err = await res.json().catch(() => ({}));
           throw new Error((err as { error?: string }).error ?? "Foto-Upload fehlgeschlagen");
         }
