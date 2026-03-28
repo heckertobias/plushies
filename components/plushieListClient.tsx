@@ -100,7 +100,7 @@ export default function PlushieListClient({ groups }: Props) {
 
   return (
     <>
-      <div className="max-w-3xl mx-auto px-6 py-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-8">
         <div className="hidden sm:flex justify-end">
           <Button onClick={() => { setSelected(undefined); setFormOpen(true); }} size="sm">
             <Plus className="h-4 w-4" />
@@ -122,7 +122,7 @@ export default function PlushieListClient({ groups }: Props) {
                 <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-widest">
                   {group}
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {items.map((p) => (
                     <SummaryCard
                       key={p.id}
