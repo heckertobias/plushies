@@ -30,6 +30,7 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
   plushie?: Plushie;
+  existingNames?: string[];
 };
 
 async function apiRequest<T>(url: string, options: RequestInit): Promise<T> {
@@ -38,7 +39,7 @@ async function apiRequest<T>(url: string, options: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) {
+export default function PlushieForm({ open, onClose, onSaved, plushie, existingNames = [] }: Props) {
   const isEdit = !!plushie;
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -46,6 +47,15 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
   const [error, setError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<PhotoChange>(null);
   const [birthday, setBirthday] = useState(plushie?.birthday ?? "");
+  const [nameValue, setNameValue] = useState(plushie?.name ?? "");
+
+  const isDuplicate =
+    nameValue.trim().length > 0 &&
+    existingNames.some(
+      (n) =>
+        n.trim().toLowerCase() === nameValue.trim().toLowerCase() &&
+        (!isEdit || n.trim().toLowerCase() !== plushie.name.trim().toLowerCase())
+    );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,10 +155,16 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
               id="name"
               name="name"
               required
-              defaultValue={plushie?.name}
+              value={nameValue}
               placeholder="z.B. Bärchi"
+              onChange={(e) => setNameValue(e.target.value)}
               onFocus={(e) => e.target.setSelectionRange(e.target.value.length, e.target.value.length)}
             />
+            {isDuplicate && (
+              <p className="text-sm text-amber-500">
+                Es gibt bereits ein Tier mit diesem Namen.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">

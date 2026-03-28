@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const all = await db.select().from(plushies);
   const groups = groupPlushies(all, dayjs());
+  const allNames = all.map((p) => p.name);
 
-  return <PlushieListClient groups={groups} />;
+  return <PlushieListClient groups={groups} allNames={allNames} />;
 }

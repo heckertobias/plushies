@@ -37,9 +37,9 @@ type ExpandState = {
   target: { top: number; left: number; width: number; height: number; borderRadius: number };
 };
 
-type Props = { groups: GroupedPlushies };
+type Props = { groups: GroupedPlushies; allNames: string[] };
 
-export default function PlushieListClient({ groups }: Props) {
+export default function PlushieListClient({ groups, allNames }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
@@ -328,6 +328,7 @@ export default function PlushieListClient({ groups }: Props) {
         onClose={() => { setFormOpen(false); setSelected(undefined); }}
         onSaved={handleSaved}
         plushie={selected}
+        existingNames={allNames}
       />
     </>
   );
