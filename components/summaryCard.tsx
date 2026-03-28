@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
 
 type Props = {
   name: string;
   birthday: string;
   avatarUrl?: string;
-  origin?: string | null;
-  notes?: string | null;
   editButton: ReactNode;
+  onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 };
 
 function avatarInitials(name: string): string {
@@ -18,23 +16,27 @@ function avatarInitials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export default function SummaryCard({ name, birthday, avatarUrl, origin, notes, editButton }: Props) {
-  const hasDetails = !!(origin || notes);
-
+export default function SummaryCard({ name, birthday, avatarUrl, editButton, onClick }: Props) {
   return (
-    <details className="group relative rounded-xl overflow-hidden border border-border bg-muted">
-      <summary className="relative flex items-center h-24 px-4 gap-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        {/* Blurred background image */}
-        {avatarUrl && (
-          <div
-            className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-45"
-            style={{ backgroundImage: `url(${avatarUrl})` }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-background/60 to-background/20" />
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => e.key === "Enter" && onClick?.(e as unknown as React.MouseEvent<HTMLDivElement>)}
+      className="group relative rounded-xl overflow-hidden border border-border bg-muted cursor-pointer hover:ring-2 hover:ring-ring transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {/* Blurred background image */}
+      {avatarUrl && (
+        <div
+          className="absolute inset-0 bg-cover bg-center scale-110 blur-md opacity-45"
+          style={{ backgroundImage: `url(${avatarUrl})` }}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-r from-background/60 to-background/20" />
 
+      <div className="relative flex items-center h-24 px-4 gap-4">
         {/* Avatar */}
-        <div className="relative h-14 w-14 rounded-lg overflow-hidden shrink-0 bg-muted-foreground/20 flex items-center justify-center text-lg font-bold text-foreground/70">
+        <div className="h-14 w-14 rounded-lg overflow-hidden shrink-0 bg-muted-foreground/20 flex items-center justify-center text-lg font-bold text-foreground/70">
           {avatarUrl ? (
             <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
           ) : (
@@ -43,36 +45,16 @@ export default function SummaryCard({ name, birthday, avatarUrl, origin, notes, 
         </div>
 
         {/* Name + birthday */}
-        <div className="relative flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
           <h3 className="text-xl font-semibold leading-tight truncate">{name}</h3>
           <p className="text-muted-foreground text-sm">{birthday}</p>
         </div>
 
-        {/* Chevron + edit */}
-        <div className="relative flex items-center gap-2 shrink-0">
-          {hasDetails && (
-            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
-          )}
+        {/* Edit button */}
+        <div className="flex items-center gap-2 shrink-0">
           {editButton}
         </div>
-      </summary>
-
-      {hasDetails && (
-        <div className="relative px-4 pb-4 pt-1 space-y-2">
-          {origin && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Herkunft</p>
-              <p className="text-sm">{origin}</p>
-            </div>
-          )}
-          {notes && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notizen</p>
-              <p className="text-sm whitespace-pre-wrap">{notes}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </details>
+      </div>
+    </div>
   );
 }
