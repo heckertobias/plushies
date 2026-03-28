@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, X } from "lucide-react";
-import { GROUP_ORDER, nextBirthday, type GroupedPlushies } from "@/lib/groupPlushies";
+import { GROUP_ORDER, nextBirthday, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import dayjs from "dayjs";
 import { photoUrl } from "@/lib/utils";
+
+const PAGE_SIZE = 25;
 
 function birthdayLabel(rawDate: string): string {
   const today = dayjs().startOf("day");
@@ -44,8 +46,39 @@ export default function PlushieListClient({ groups }: Props) {
   const [selected, setSelected] = useState<Plushie | undefined>();
   const [expand, setExpand] = useState<ExpandState | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const isEmpty = GROUP_ORDER.every((g) => groups[g].length === 0);
+  // Flatten all plushies in group order
+  const flatList: { group: Group; plushie: Plushie }[] = GROUP_ORDER.flatMap((g) =>
+    groups[g].map((p) => ({ group: g, plushie: p }))
+  );
+  const totalCount = flatList.length;
+  const visibleFlat = flatList.slice(0, visibleCount);
+
+  // Reconstruct visible groups preserving order
+  const visibleGroups = GROUP_ORDER.reduce<Partial<Record<Group, Plushie[]>>>((acc, g) => {
+    const items = visibleFlat.filter((x) => x.group === g).map((x) => x.plushie);
+    if (items.length > 0) acc[g] = items;
+    return acc;
+  }, {});
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && visibleCount < totalCount) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, totalCount));
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleCount, totalCount]);
+
+  const isEmpty = totalCount === 0;
 
   function handleSaved() {
     setFormOpen(false);
@@ -114,38 +147,41 @@ export default function PlushieListClient({ groups }: Props) {
             <p className="text-muted-foreground">Noch keine Plüschtiere angelegt.<br />Leg gleich los!</p>
           </div>
         ) : (
-          GROUP_ORDER.map((group) => {
-            const items = groups[group];
-            if (items.length === 0) return null;
-            return (
-              <section key={group}>
-                <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-widest">
-                  {group}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {items.map((p) => (
-                    <SummaryCard
-                      key={p.id}
-                      name={p.name}
-                      birthday={birthdayLabel(p.birthday)}
-                      avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
-                      onClick={(e) => openDetail(p, e)}
-                      editButton={
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                          className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
-                          aria-label="Bearbeiten"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      }
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })
+          <>
+            {GROUP_ORDER.map((group) => {
+              const items = visibleGroups[group];
+              if (!items || items.length === 0) return null;
+              return (
+                <section key={group}>
+                  <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-widest">
+                    {group}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {items.map((p) => (
+                      <SummaryCard
+                        key={p.id}
+                        name={p.name}
+                        birthday={birthdayLabel(p.birthday)}
+                        avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
+                        onClick={(e) => openDetail(p, e)}
+                        editButton={
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                            className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
+                            aria-label="Bearbeiten"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+            <div ref={sentinelRef} />
+          </>
         )}
       </div>
 
