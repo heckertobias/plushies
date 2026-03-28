@@ -268,7 +268,7 @@ export default function PlushieListClient({ groups }: Props) {
               <button
                 type="button"
                 onClick={() => openEdit(expand.plushie)}
-                className="rounded-full bg-black/40 hover:bg-black/60 p-1.5 text-white transition-colors"
+                className="rounded-full bg-black/40 hover:bg-black/60 p-1.5 text-white transition-colors cursor-pointer"
                 aria-label="Bearbeiten"
               >
                 <Pencil className="h-4 w-4" />
@@ -276,7 +276,7 @@ export default function PlushieListClient({ groups }: Props) {
               <button
                 type="button"
                 onClick={closeDetail}
-                className="rounded-full bg-black/40 hover:bg-black/60 p-1.5 text-white transition-colors"
+                className="rounded-full bg-black/40 hover:bg-black/60 p-1.5 text-white transition-colors cursor-pointer"
                 aria-label="Schließen"
               >
                 <X className="h-4 w-4" />

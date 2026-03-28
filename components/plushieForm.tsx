@@ -3,20 +3,20 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Plushie } from "@/lib/schema";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import PhotoUpload, { type PhotoChange } from "@/components/photoUpload";
 import DatePicker from "@/components/datePicker";
 import { photoUrl } from "@/lib/utils";
+import { Save, X, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 
 type PlushieInput = {
   name: string;
@@ -85,7 +85,6 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
         form.append("photo", photo);
         const res = await fetch(`/api/plushies/${saved.id}/photo`, { method: "POST", body: form });
         if (!res.ok) {
-          // Neu angelegtes Plüschtier wieder löschen damit kein verwaister Eintrag entsteht
           if (!isEdit) await fetch(`/api/plushies/${saved.id}`, { method: "DELETE" });
           const err = await res.json().catch(() => ({}));
           throw new Error((err as { error?: string }).error ?? "Foto-Upload fehlgeschlagen");
@@ -115,17 +114,41 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
     }
   }
 
+  const busy = saving || deleting;
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Plüschtier bearbeiten" : "Neues Plüschtier"}</DialogTitle>
-        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Header: title + close button */}
+        <div className="flex items-center justify-between gap-2">
+          <DialogTitle>
+            {isEdit ? "Plüschtier bearbeiten" : "Neues Plüschtier"}
+          </DialogTitle>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="Schließen"
+            className="rounded-full p-2 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50 transition-colors shrink-0 cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <form id="plushie-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name">Name *</Label>
-            <Input id="name" name="name" required defaultValue={plushie?.name} placeholder="z.B. Bärchi" />
+            <Input
+              id="name"
+              name="name"
+              required
+              defaultValue={plushie?.name}
+              placeholder="z.B. Bärchi"
+              onFocus={(e) => e.target.setSelectionRange(e.target.value.length, e.target.value.length)}
+            />
           </div>
 
           <div className="space-y-1">
@@ -151,37 +174,34 @@ export default function PlushieForm({ open, onClose, onSaved, plushie }: Props) 
             />
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
           <DialogFooter className="gap-2">
             {isEdit && !confirmDelete && (
-              <Button type="button" variant="destructive" onClick={() => setConfirmDelete(true)} disabled={deleting || saving}>
+              <Button type="button" variant="destructive" onClick={() => setConfirmDelete(true)} disabled={busy}>
+                <Trash2 className="h-4 w-4" />
                 Löschen
               </Button>
             )}
             {isEdit && confirmDelete && (
               <>
                 <span className="text-sm text-muted-foreground self-center">Wirklich löschen?</span>
-                <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
+                <Button type="button" variant="destructive" onClick={handleDelete} disabled={busy}>
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   {deleting ? "Löschen…" : "Ja, löschen"}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                <Button type="button" variant="outline" onClick={() => setConfirmDelete(false)} disabled={busy}>
                   Abbrechen
                 </Button>
               </>
             )}
             {!confirmDelete && (
-              <>
-                <Button type="button" variant="outline" onClick={onClose} disabled={saving || deleting}>
-                  Abbrechen
-                </Button>
-                <Button type="submit" disabled={saving || deleting}>
-                  {saving ? "Speichern…" : "Speichern"}
-                </Button>
-              </>
+              <Button type="submit" disabled={busy}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? "Speichern…" : "Speichern"}
+              </Button>
             )}
           </DialogFooter>
         </form>
+
       </DialogContent>
     </Dialog>
   );
