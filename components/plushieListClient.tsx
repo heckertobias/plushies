@@ -20,7 +20,7 @@ function birthdayLabel(rawDate: string): string {
   if (diff === 0) return "🎂 Heute!";
   if (diff === 1) return "🎂 Morgen";
   if (diff <= 30) return `🎂 in ${diff} Tagen`;
-  return `🎂 ${next.format("DD.MM.")}`;
+  return `🎂 ${next.format("DD.MM.YYYY")}`;
 }
 
 function avatarInitials(name: string): string {
@@ -250,7 +250,13 @@ export default function PlushieListClient({ groups, allNames }: Props) {
               <div className="flex-1 px-6 py-5 space-y-4 overflow-y-auto">
                 <div>
                   <h2 className="text-2xl font-semibold leading-tight">{expand.plushie.name}</h2>
-                  <p className="text-muted-foreground text-sm mt-0.5">{birthdayLabel(expand.plushie.birthday)}</p>
+                  <p className="text-muted-foreground text-sm mt-0.5">
+                    {(() => {
+                      const bd = dayjs(expand.plushie.birthday);
+                      const age = dayjs().diff(bd, "year");
+                      return `${bd.format("DD.MM.YYYY")} · ${age} Jahre`;
+                    })()}
+                  </p>
                 </div>
 
                 {expand.plushie.origin && (
