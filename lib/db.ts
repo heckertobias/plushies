@@ -1,6 +1,5 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { migrate } from "drizzle-orm/libsql/migrator";
 import { join } from "node:path";
 import * as schema from "./schema";
 
@@ -11,9 +10,7 @@ const globalForDb = globalThis as unknown as { db: ReturnType<typeof drizzle<typ
 
 function createDb() {
   const client = createClient({ url: DB_URL });
-  const db = drizzle(client, { schema });
-  migrate(db, { migrationsFolder: join(process.cwd(), "drizzle") });
-  return db;
+  return drizzle(client, { schema });
 }
 
 export const db = globalForDb.db ?? (globalForDb.db = createDb());

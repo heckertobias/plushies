@@ -15,15 +15,16 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;
-  let body: { name?: string; birthday?: string; origin?: string; notes?: string };
+  let body: { name?: string; birthday?: string; origin?: string; notes?: string; tags?: string[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Ungültige Anfrage" }, { status: 400 });
   }
+  const { tags, ...rest } = body;
   const [updated] = await db
     .update(plushies)
-    .set({ ...body, updatedAt: new Date().toISOString() })
+    .set({ ...rest, tags: tags !== undefined ? JSON.stringify(tags) : undefined, updatedAt: new Date().toISOString() })
     .where(eq(plushies.id, Number(id)))
     .returning();
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });

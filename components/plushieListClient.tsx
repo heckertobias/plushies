@@ -9,7 +9,7 @@ import { Plus, Pencil, X } from "lucide-react";
 import { GROUP_ORDER, nextBirthday, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import dayjs from "dayjs";
-import { photoUrl } from "@/lib/utils";
+import { photoUrl, parseTags } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
@@ -37,9 +37,9 @@ type ExpandState = {
   target: { top: number; left: number; width: number; height: number; borderRadius: number };
 };
 
-type Props = { groups: GroupedPlushies; allNames: string[] };
+type Props = { groups: GroupedPlushies; allNames: string[]; allTags: string[] };
 
-export default function PlushieListClient({ groups, allNames }: Props) {
+export default function PlushieListClient({ groups, allNames, allTags }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
@@ -273,6 +273,19 @@ export default function PlushieListClient({ groups, allNames }: Props) {
                     <p className="text-sm mt-0.5 whitespace-pre-wrap">{expand.plushie.notes}</p>
                   </div>
                 )}
+
+                {parseTags(expand.plushie.tags).length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tags</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {parseTags(expand.plushie.tags).map((tag) => (
+                        <span key={tag} className="inline-flex items-center rounded-md bg-secondary text-secondary-foreground px-2 py-0.5 text-xs font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -336,6 +349,7 @@ export default function PlushieListClient({ groups, allNames }: Props) {
         onSaved={handleSaved}
         plushie={selected}
         existingNames={allNames}
+        allTags={allTags}
       />
     </>
   );

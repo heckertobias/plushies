@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import PhotoUpload, { type PhotoChange } from "@/components/photoUpload";
 import DatePicker from "@/components/datePicker";
-import { photoUrl } from "@/lib/utils";
+import TagInput from "@/components/tagInput";
+import { photoUrl, parseTags } from "@/lib/utils";
 import { Save, X, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -23,6 +24,7 @@ type PlushieInput = {
   birthday: string;
   origin?: string;
   notes?: string;
+  tags?: string[];
 };
 
 type Props = {
@@ -31,6 +33,7 @@ type Props = {
   onSaved: () => void;
   plushie?: Plushie;
   existingNames?: string[];
+  allTags?: string[];
 };
 
 async function apiRequest<T>(url: string, options: RequestInit): Promise<T> {
@@ -39,7 +42,7 @@ async function apiRequest<T>(url: string, options: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export default function PlushieForm({ open, onClose, onSaved, plushie, existingNames = [] }: Props) {
+export default function PlushieForm({ open, onClose, onSaved, plushie, existingNames = [], allTags = [] }: Props) {
   const isEdit = !!plushie;
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -48,6 +51,7 @@ export default function PlushieForm({ open, onClose, onSaved, plushie, existingN
   const [photo, setPhoto] = useState<PhotoChange>(null);
   const [birthday, setBirthday] = useState(plushie?.birthday ?? "");
   const [nameValue, setNameValue] = useState(plushie?.name ?? "");
+  const [tags, setTags] = useState<string[]>(parseTags(plushie?.tags));
 
   const isDuplicate =
     nameValue.trim().length > 0 &&
@@ -72,6 +76,7 @@ export default function PlushieForm({ open, onClose, onSaved, plushie, existingN
       birthday,
       origin: (data.get("origin") as string) || undefined,
       notes: (data.get("notes") as string) || undefined,
+      tags,
     };
 
     setSaving(true);
@@ -180,6 +185,11 @@ export default function PlushieForm({ open, onClose, onSaved, plushie, existingN
           <div className="space-y-1">
             <Label htmlFor="notes">Notizen</Label>
             <Textarea id="notes" name="notes" defaultValue={plushie?.notes ?? ""} placeholder="Besonderheiten, …" rows={3} />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Tags</Label>
+            <TagInput value={tags} onChange={setTags} suggestions={allTags} />
           </div>
 
           <div className="space-y-1">
