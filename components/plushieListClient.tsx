@@ -43,6 +43,7 @@ export default function PlushieListClient({ groups, allNames }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   const [selected, setSelected] = useState<Plushie | undefined>();
   const [expand, setExpand] = useState<ExpandState | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -135,7 +136,7 @@ export default function PlushieListClient({ groups, allNames }: Props) {
     <>
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-8">
         <div className="hidden sm:flex justify-end">
-          <Button onClick={() => { setSelected(undefined); setFormOpen(true); }} size="sm">
+          <Button onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }} size="sm">
             <Plus className="h-4 w-4" />
             Neu
           </Button>
@@ -187,7 +188,7 @@ export default function PlushieListClient({ groups, allNames }: Props) {
 
       {/* Floating action button — mobile only */}
       <Button
-        onClick={() => { setSelected(undefined); setFormOpen(true); }}
+        onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }}
         size="icon"
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg sm:hidden"
         aria-label="Neues Plüschtier"
@@ -329,7 +330,7 @@ export default function PlushieListClient({ groups, allNames }: Props) {
       )}
 
       <PlushieForm
-        key={selected?.id ?? "new"}
+        key={selected ? `edit-${selected.id}` : `new-${formKey}`}
         open={formOpen}
         onClose={() => { setFormOpen(false); setSelected(undefined); }}
         onSaved={handleSaved}
