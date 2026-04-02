@@ -15,6 +15,13 @@
       "when": 1774080017259,
       "tag": "0001_add_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1774080017260,
+      "tag": "0002_add_original_photo_path",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ export const plushies = sqliteTable("plushies", {
   origin: text(),
   notes: text(),
   photoPath: text("photo_path"),
+  originalPhotoPath: text("original_photo_path"),
   tags: text(), // JSON array of strings
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),

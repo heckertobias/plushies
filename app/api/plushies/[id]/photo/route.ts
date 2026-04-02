@@ -18,19 +18,19 @@ export async function POST(request: Request, { params }: Params) {
   if (!(file instanceof Blob)) return NextResponse.json({ error: "No photo provided" }, { status: 400 });
   if (file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "Foto zu groß (max. 10 MB)" }, { status: 413 });
 
-  const originalName = file instanceof File ? file.name : "";
-  const ext = originalName.includes(".") ? originalName.split(".").pop() || "jpg" : "jpg";
-  const filename = `${numId}-${Date.now()}.${ext}`;
+  if (existing.photoPath) {
+    await storage.delete(existing.photoPath, existing.originalPhotoPath);
+  }
 
-  if (existing.photoPath) await storage.delete(existing.photoPath);
-  const savedPath = await storage.save(file, filename);
+  const base = `${numId}-${Date.now()}`;
+  const { optimizedPath, originalPath } = await storage.save(file as File, base);
 
   await db
     .update(plushies)
-    .set({ photoPath: savedPath, updatedAt: new Date().toISOString() })
+    .set({ photoPath: optimizedPath, originalPhotoPath: originalPath, updatedAt: new Date().toISOString() })
     .where(eq(plushies.id, numId));
 
-  return NextResponse.json({ photoUrl: storage.publicUrl(savedPath) });
+  return NextResponse.json({ photoUrl: storage.publicUrl(optimizedPath) });
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
@@ -40,11 +40,13 @@ export async function DELETE(_request: Request, { params }: Params) {
   const [existing] = await db.select().from(plushies).where(eq(plushies.id, numId));
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (existing.photoPath) await storage.delete(existing.photoPath);
+  if (existing.photoPath) {
+    await storage.delete(existing.photoPath, existing.originalPhotoPath);
+  }
 
   await db
     .update(plushies)
-    .set({ photoPath: null, updatedAt: new Date().toISOString() })
+    .set({ photoPath: null, originalPhotoPath: null, updatedAt: new Date().toISOString() })
     .where(eq(plushies.id, numId));
 
   return new NextResponse(null, { status: 204 });
