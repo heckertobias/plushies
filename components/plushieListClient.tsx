@@ -4,14 +4,18 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
+import SearchBar from "@/components/searchBar";
+import FilterDialog from "@/components/filterDialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, X } from "lucide-react";
-import { GROUP_ORDER, nextBirthday, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
+import { GROUP_ORDER, nextBirthday, groupPlushies, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
+import { searchPlushies, filterPlushies, type FilterState, EMPTY_FILTER, activeFilterCount, isFilterActive } from "@/lib/search";
 import dayjs from "dayjs";
 import { photoUrl, parseTags } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
+const DEBOUNCE_MS = 250;
 
 function birthdayLabel(rawDate: string): string {
   const today = dayjs().startOf("day");
@@ -37,9 +41,9 @@ type ExpandState = {
   target: { top: number; left: number; width: number; height: number; borderRadius: number };
 };
 
-type Props = { groups: GroupedPlushies; allNames: string[]; allTags: string[] };
+type Props = { groups: GroupedPlushies; allPlushies: Plushie[]; allNames: string[]; allTags: string[] };
 
-export default function PlushieListClient({ groups, allNames, allTags }: Props) {
+export default function PlushieListClient({ groups, allPlushies, allNames, allTags }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
@@ -50,19 +54,54 @@ export default function PlushieListClient({ groups, allNames, allTags }: Props) 
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Flatten all plushies in group order
-  const flatList: { group: Group; plushie: Plushie }[] = GROUP_ORDER.flatMap((g) =>
-    groups[g].map((p) => ({ group: g, plushie: p }))
-  );
+  // Search & filter state
+  const [rawQuery, setRawQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(rawQuery), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
+
+  // Reset pagination when search/filter changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [debouncedQuery, filters]);
+
+  // Derive active display list
+  const isSearching = debouncedQuery.trim().length > 0;
+  const filtering = isFilterActive(filters);
+  const filterCount = activeFilterCount(filters);
+
+  let flatSearchResults: Plushie[] | null = null;
+  let filteredGroups: GroupedPlushies | null = null;
+
+  if (isSearching) {
+    const base = filtering ? filterPlushies(allPlushies, filters) : allPlushies;
+    flatSearchResults = searchPlushies(debouncedQuery, base);
+  } else if (filtering) {
+    const filtered = filterPlushies(allPlushies, filters);
+    filteredGroups = groupPlushies(filtered, dayjs());
+  }
+
+  // Build flat list for infinite scroll
+  const activeGroups: GroupedPlushies = filteredGroups ?? groups;
+  const flatList: { group: Group; plushie: Plushie }[] = flatSearchResults
+    ? flatSearchResults.map((p) => ({ group: "Später" as Group, plushie: p }))
+    : GROUP_ORDER.flatMap((g) => activeGroups[g].map((p) => ({ group: g, plushie: p })));
+
   const totalCount = flatList.length;
   const visibleFlat = flatList.slice(0, visibleCount);
 
-  // Reconstruct visible groups preserving order
   const visibleGroups = GROUP_ORDER.reduce<Partial<Record<Group, Plushie[]>>>((acc, g) => {
     const items = visibleFlat.filter((x) => x.group === g).map((x) => x.plushie);
     if (items.length > 0) acc[g] = items;
     return acc;
   }, {});
+
+  const visibleSearchResults = flatSearchResults ? visibleFlat.map((x) => x.plushie) : null;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -80,6 +119,7 @@ export default function PlushieListClient({ groups, allNames, allTags }: Props) 
   }, [visibleCount, totalCount]);
 
   const isEmpty = totalCount === 0;
+  const baseIsEmpty = allPlushies.length === 0;
 
   function handleSaved() {
     setFormOpen(false);
@@ -132,22 +172,75 @@ export default function PlushieListClient({ groups, allNames, allTags }: Props) 
 
   const TRANSITION = "top 0.38s cubic-bezier(0.34,1.1,0.64,1), left 0.38s cubic-bezier(0.34,1.1,0.64,1), width 0.38s cubic-bezier(0.34,1.1,0.64,1), height 0.38s cubic-bezier(0.34,1.1,0.64,1), border-radius 0.38s ease";
 
+  function renderCard(p: Plushie) {
+    return (
+      <SummaryCard
+        key={p.id}
+        name={p.name}
+        birthday={birthdayLabel(p.birthday)}
+        avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
+        onClick={(e) => openDetail(p, e)}
+        editButton={
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+            className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
+            aria-label="Bearbeiten"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        }
+      />
+    );
+  }
+
   return (
     <>
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-8">
-        <div className="hidden sm:flex justify-end">
-          <Button onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }} size="sm">
-            <Plus className="h-4 w-4" />
-            Neu
-          </Button>
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <SearchBar
+              value={rawQuery}
+              onChange={setRawQuery}
+              onFilterClick={() => setFilterOpen(true)}
+              activeFilterCount={filterCount}
+            />
+          </div>
+          <div className="hidden sm:block">
+            <Button onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }} size="sm">
+              <Plus className="h-4 w-4" />
+              Neu
+            </Button>
+          </div>
         </div>
 
-        {isEmpty ? (
+        {/* Result count when searching/filtering */}
+        {(isSearching || filtering) && (
+          <p className="text-sm text-muted-foreground -mt-2">
+            {totalCount === 0
+              ? "Keine Ergebnisse"
+              : `${totalCount} ${totalCount === 1 ? "Ergebnis" : "Ergebnisse"}`}
+          </p>
+        )}
+
+        {baseIsEmpty ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <span className="text-5xl">🧸</span>
             <p className="text-muted-foreground">Noch keine Plüschtiere angelegt.<br />Leg gleich los!</p>
           </div>
+        ) : isEmpty ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className="text-4xl">🔍</span>
+            <p className="text-muted-foreground">Kein Plüschtier gefunden.</p>
+          </div>
+        ) : isSearching && visibleSearchResults ? (
+          // Flat search results (no group headers)
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {visibleSearchResults.map(renderCard)}
+          </div>
         ) : (
+          // Grouped view (normal or filtered)
           <>
             {GROUP_ORDER.map((group) => {
               const items = visibleGroups[group];
@@ -158,32 +251,15 @@ export default function PlushieListClient({ groups, allNames, allTags }: Props) 
                     {group}
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {items.map((p) => (
-                      <SummaryCard
-                        key={p.id}
-                        name={p.name}
-                        birthday={birthdayLabel(p.birthday)}
-                        avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
-                        onClick={(e) => openDetail(p, e)}
-                        editButton={
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                            className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
-                            aria-label="Bearbeiten"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        }
-                      />
-                    ))}
+                    {items.map(renderCard)}
                   </div>
                 </section>
               );
             })}
-            <div ref={sentinelRef} />
           </>
         )}
+
+        <div ref={sentinelRef} />
       </div>
 
       {/* Floating action button — mobile only */}
@@ -341,6 +417,14 @@ export default function PlushieListClient({ groups, allNames, allTags }: Props) 
           </div>
         </>
       )}
+
+      <FilterDialog
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        allTags={allTags}
+        filters={filters}
+        onApply={setFilters}
+      />
 
       <PlushieForm
         key={selected ? `edit-${selected.id}` : `new-${formKey}`}

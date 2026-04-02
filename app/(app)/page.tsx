@@ -13,5 +13,5 @@ export default async function Page() {
   const allNames = all.map((p) => p.name);
   const allTags = [...new Set(all.flatMap((p) => parseTags(p.tags)))].sort();
 
-  return <PlushieListClient groups={groups} allNames={allNames} allTags={allTags} />;
+  return <PlushieListClient groups={groups} allPlushies={all} allNames={allNames} allTags={allTags} />;
 }
