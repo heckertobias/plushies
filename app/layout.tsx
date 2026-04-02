@@ -3,7 +3,12 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "Plüschie-Kalender",
+  title: "Plushies",
+  appleWebApp: {
+    capable: true,
+    title: "Plushies",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
