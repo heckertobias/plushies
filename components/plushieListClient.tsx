@@ -8,6 +8,7 @@ import SearchBar from "@/components/searchBar";
 import FilterDialog from "@/components/filterDialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, X } from "lucide-react";
+import LogoutButton from "@/components/logoutButton";
 import { GROUP_ORDER, nextBirthday, groupPlushies, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
 import { searchPlushies, filterPlushies, type FilterState, EMPTY_FILTER, activeFilterCount, isFilterActive } from "@/lib/search";
@@ -196,9 +197,15 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Toolbar */}
-        <div className="flex items-center gap-3">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-30 bg-card border-b">
+        {/* Desktop: single row — logo | search+filter | neu | logout */}
+        <div className="hidden sm:flex max-w-7xl mx-auto px-6 py-3 items-center gap-4">
+          <span className="text-2xl leading-none shrink-0" aria-hidden="true">🧸</span>
+          <div className="shrink-0">
+            <h1 className="text-sm font-bold leading-tight">Plüschie-Kalender</h1>
+            <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
+          </div>
           <div className="flex-1">
             <SearchBar
               value={rawQuery}
@@ -207,14 +214,35 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
               activeFilterCount={filterCount}
             />
           </div>
-          <div className="hidden sm:block">
-            <Button onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }} size="sm">
-              <Plus className="h-4 w-4" />
-              Neu
-            </Button>
-          </div>
+          <Button onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }} size="sm">
+            <Plus className="h-4 w-4" />
+            Neu
+          </Button>
+          <LogoutButton />
         </div>
 
+        {/* Mobile: two rows — logo+logout / search+filter */}
+        <div className="sm:hidden">
+          <div className="px-6 py-4 flex items-center gap-3">
+            <span className="text-3xl leading-none" aria-hidden="true">🧸</span>
+            <div className="flex-1">
+              <h1 className="text-lg font-bold leading-tight">Plüschie-Kalender</h1>
+              <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
+            </div>
+            <LogoutButton />
+          </div>
+          <div className="px-6 pb-3">
+            <SearchBar
+              value={rawQuery}
+              onChange={setRawQuery}
+              onFilterClick={() => setFilterOpen(true)}
+              activeFilterCount={filterCount}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Result count when searching/filtering */}
         {(isSearching || filtering) && (
           <p className="text-sm text-muted-foreground -mt-2">

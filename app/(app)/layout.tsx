@@ -1,19 +1,22 @@
-import LogoutButton from "@/components/logoutButton";
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const year = new Date().getFullYear();
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
-          <span className="text-3xl leading-none" aria-hidden="true">🧸</span>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold leading-tight">Plüschie-Kalender</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
-          </div>
-          <LogoutButton />
-        </div>
-      </header>
-      <main>{children}</main>
+    <div className="min-h-screen bg-background flex flex-col">
+      <main className="flex-1">{children}</main>
+      <footer className="border-t py-4 px-6">
+        <p className="text-center text-xs text-muted-foreground">
+          © {year}{" "}
+          <a
+            href="https://github.com/heckertobias"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            Tobias Hecker
+          </a>
+        </p>
+      </footer>
     </div>
   );
 }
