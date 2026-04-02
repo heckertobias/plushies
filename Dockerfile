@@ -31,6 +31,10 @@ COPY --from=builder /app/.next/static ./.next/static
 # Copy drizzle migrations (needed at runtime for auto-migrate)
 COPY --from=builder /app/drizzle ./drizzle
 
+# Copy scripts + node_modules for manual maintenance tasks (e.g. migrate-photos)
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/node_modules ./node_modules
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
