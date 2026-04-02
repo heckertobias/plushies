@@ -24,7 +24,7 @@ function birthdayLabel(rawDate: string): string {
   if (diff === 0) return "🎂 Heute!";
   if (diff === 1) return "🎂 Morgen";
   if (diff <= 30) return `🎂 in ${diff} Tagen`;
-  return `🎂 ${next.format("DD.MM.YYYY")}`;
+  return `🎂 ${next.format("DD.MM.")}`;
 }
 
 function avatarInitials(name: string): string {
