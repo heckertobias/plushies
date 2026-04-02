@@ -10,7 +10,7 @@
 
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { isNotNull, eq } from "drizzle-orm";
+import { isNotNull, eq } from "drizzle-orm"; // isNotNull used in query below
 import { join, parse } from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import sharp from "sharp";
@@ -24,7 +24,8 @@ const db = drizzle(client, { schema });
 
 async function main() {
   const rows = await db.select().from(plushies).where(isNotNull(plushies.photoPath));
-  const pending = rows.filter((p) => p.photoPath && !p.originalPhotoPath);
+  // Process all photos — re-run to apply EXIF rotation fix
+  const pending = rows.filter((p) => p.photoPath);
 
   if (pending.length === 0) {
     console.log("Nichts zu migrieren.");
@@ -37,29 +38,23 @@ async function main() {
   let fail = 0;
 
   for (const p of pending) {
-    const originalPath = p.photoPath!;
-    const { dir, name } = parse(originalPath);
-
-    // Already a WebP — just set originalPhotoPath
-    if (originalPath.endsWith(".webp")) {
-      await db.update(plushies).set({ originalPhotoPath: originalPath }).where(eq(plushies.id, p.id));
-      console.log(`  [SKIP] ${p.name} — bereits WebP, originalPhotoPath gesetzt`);
-      ok++;
-      continue;
-    }
+    // Source is the original file if available, otherwise the current photoPath
+    const sourcePath = p.originalPhotoPath ?? p.photoPath!;
+    const { dir, name } = parse(sourcePath);
 
     try {
       const webpPath = join(dir, `${name}.webp`);
-      const buffer = await readFile(originalPath);
+      const buffer = await readFile(sourcePath);
 
       await sharp(buffer)
+        .rotate()
         .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 80 })
         .toFile(webpPath);
 
       await db
         .update(plushies)
-        .set({ photoPath: webpPath, originalPhotoPath: originalPath })
+        .set({ photoPath: webpPath, originalPhotoPath: sourcePath })
         .where(eq(plushies.id, p.id));
 
       const { size } = await stat(webpPath);

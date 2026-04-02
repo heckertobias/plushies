@@ -25,6 +25,7 @@ export const storage = {
     await writeFile(originalPath, buffer);
 
     await sharp(buffer)
+      .rotate()
       .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: WEBP_QUALITY })
       .toFile(optimizedPath);
