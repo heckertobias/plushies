@@ -7,7 +7,7 @@ import PlushieForm from "@/components/plushieForm";
 import SearchBar from "@/components/searchBar";
 import FilterDialog from "@/components/filterDialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, X } from "lucide-react";
+import { Plus, Pencil, X, RefreshCw } from "lucide-react";
 import LogoutButton from "@/components/logoutButton";
 import { GROUP_ORDER, nextBirthday, groupPlushies, type GroupedPlushies, type Group } from "@/lib/groupPlushies";
 import type { Plushie } from "@/lib/schema";
@@ -70,6 +70,17 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [debouncedQuery, filters]);
+
+  // Auto-reload when PWA is brought back to foreground
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        startTransition(() => router.refresh());
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [router]);
 
   // Derive active display list
   const isSearching = debouncedQuery.trim().length > 0;
@@ -181,16 +192,6 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
         birthday={birthdayLabel(p.birthday)}
         avatarUrl={p.photoPath ? photoUrl(p.photoPath) : undefined}
         onClick={(e) => openDetail(p, e)}
-        editButton={
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-            className="rounded-full p-1.5 hover:bg-accent transition-colors cursor-pointer"
-            aria-label="Bearbeiten"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        }
       />
     );
   }
@@ -229,6 +230,16 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
               <h1 className="text-lg font-bold leading-tight">Plüschie-Kalender</h1>
               <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => startTransition(() => router.refresh())}
+              aria-label="Neu laden"
+              title="Neu laden"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <LogoutButton />
           </div>
           <div className="px-6 pb-3">

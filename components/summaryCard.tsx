@@ -1,10 +1,7 @@
-import type { ReactNode } from "react";
-
 type Props = {
   name: string;
   birthday: string;
   avatarUrl?: string;
-  editButton: ReactNode;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 };
 
@@ -16,7 +13,7 @@ function avatarInitials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export default function SummaryCard({ name, birthday, avatarUrl, editButton, onClick }: Props) {
+export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Props) {
   return (
     <div
       role="button"
@@ -50,10 +47,6 @@ export default function SummaryCard({ name, birthday, avatarUrl, editButton, onC
           <p className="text-muted-foreground text-sm">{birthday}</p>
         </div>
 
-        {/* Edit button */}
-        <div className="flex items-center gap-2 shrink-0">
-          {editButton}
-        </div>
       </div>
     </div>
   );
