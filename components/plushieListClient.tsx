@@ -46,7 +46,7 @@ type Props = { groups: GroupedPlushies; allPlushies: Plushie[]; allNames: string
 
 export default function PlushieListClient({ groups, allPlushies, allNames, allTags }: Props) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [formOpen, setFormOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [selected, setSelected] = useState<Plushie | undefined>();
@@ -236,9 +236,10 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
               onClick={() => startTransition(() => router.refresh())}
               aria-label="Neu laden"
               title="Neu laden"
+              disabled={isPending}
               className="text-muted-foreground hover:text-foreground"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 transition-transform ${isPending ? "animate-spin" : ""}`} />
             </Button>
             <LogoutButton />
           </div>
