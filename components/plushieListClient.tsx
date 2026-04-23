@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
@@ -14,6 +14,7 @@ import type { Plushie } from "@/lib/schema";
 import { searchPlushies, filterPlushies, type FilterState, EMPTY_FILTER, activeFilterCount, isFilterActive } from "@/lib/search";
 import dayjs from "dayjs";
 import { photoUrl, parseTags } from "@/lib/utils";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 const PAGE_SIZE = 25;
 const DEBOUNCE_MS = 250;
@@ -54,6 +55,16 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
   const [isOpen, setIsOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const handleRefresh = useCallback(() => {
+    startTransition(() => router.refresh());
+  }, [router]);
+
+  const { pullDistance, isPulling } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    isRefreshing: isPending,
+    enabled: !expand && !formOpen,
+  });
 
   // Search & filter state
   const [rawQuery, setRawQuery] = useState("");
@@ -253,6 +264,22 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
           </div>
         </div>
       </div>
+
+      {/* Pull-to-refresh indicator */}
+      {(isPulling || isPending) && (
+        <div
+          className="flex items-end justify-center overflow-hidden transition-[height] duration-300"
+          style={{ height: isPulling ? pullDistance : isPending ? 48 : 0 }}
+        >
+          <RefreshCw
+            className={`h-5 w-5 mb-2 text-muted-foreground ${isPending ? "animate-spin" : ""}`}
+            style={{
+              transform: isPulling ? `rotate(${pullDistance * 4}deg)` : undefined,
+              opacity: Math.min(pullDistance / 48, 1),
+            }}
+          />
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Result count when searching/filtering */}
