@@ -15,6 +15,7 @@ import { searchPlushies, filterPlushies, type FilterState, EMPTY_FILTER, activeF
 import dayjs from "dayjs";
 import { photoUrl, parseTags } from "@/lib/utils";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useSwipeToDismiss } from "@/hooks/useSwipeToDismiss";
 
 const PAGE_SIZE = 25;
 const DEBOUNCE_MS = 250;
@@ -55,6 +56,9 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
   const [isOpen, setIsOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const gestureLockRef = useRef<"none" | "horizontal" | "vertical">("none");
 
   const handleRefresh = useCallback(() => {
     startTransition(() => router.refresh());
@@ -64,6 +68,13 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
     onRefresh: handleRefresh,
     isRefreshing: isPending,
     enabled: !expand && !formOpen,
+  });
+
+  useSwipeToDismiss(cardRef, {
+    onDismiss: closeDetail,
+    enabled: isOpen && !!expand,
+    gestureLockRef,
+    scrollContainerRef: contentRef,
   });
 
   // Search & filter state
@@ -180,9 +191,14 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
     requestAnimationFrame(() => requestAnimationFrame(() => setIsOpen(true)));
   }
 
-  function closeDetail() {
-    setIsOpen(false);
-    setTimeout(() => setExpand(null), 380);
+  function closeDetail(skipAnimation = false) {
+    if (skipAnimation) {
+      setExpand(null);
+      setIsOpen(false);
+    } else {
+      setIsOpen(false);
+      setTimeout(() => setExpand(null), 380);
+    }
   }
 
   function openEdit(p: Plushie) {
@@ -346,11 +362,12 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
           <div
             className="fixed inset-0 z-40 bg-black/50"
             style={{ opacity: isOpen ? 1 : 0, transition: "opacity 0.35s ease" }}
-            onClick={closeDetail}
+            onClick={() => closeDetail()}
           />
 
           {/* Expanding card */}
           <div
+            ref={cardRef}
             className="fixed z-50 overflow-hidden bg-muted border border-border shadow-2xl"
             style={{
               top: isOpen ? expand.target.top : expand.origin.top,
@@ -363,8 +380,9 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
           >
             {/* === Expanded content (fades in after card grows) === */}
             <div
+              ref={contentRef}
               className="absolute inset-0 flex flex-col overflow-y-auto"
-              style={{ opacity: isOpen ? 1 : 0, transition: "opacity 0.18s ease 0.22s" }}
+              style={{ opacity: isOpen ? 1 : 0, transition: "opacity 0.18s ease 0.22s", touchAction: "pan-y pinch-zoom" }}
             >
               {/* Hero image */}
               <div className="relative w-full shrink-0 bg-muted-foreground/10 overflow-hidden" style={{ height: "45%" }}>
@@ -474,7 +492,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
               </button>
               <button
                 type="button"
-                onClick={closeDetail}
+                onClick={() => closeDetail()}
                 className="rounded-full bg-black/40 hover:bg-black/60 p-1.5 text-white transition-colors cursor-pointer"
                 aria-label="Schließen"
               >
