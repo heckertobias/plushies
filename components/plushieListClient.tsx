@@ -199,7 +199,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
   return (
     <>
       {/* Sticky header */}
-      <div className="sticky top-0 z-30 bg-card border-b">
+      <div className="sticky top-0 z-30 bg-card border-b safe-top">
         {/* Desktop: single row — logo | search+filter | neu | logout */}
         <div className="hidden sm:flex max-w-7xl mx-auto px-6 py-3 items-center gap-4">
           <span className="text-2xl leading-none shrink-0" aria-hidden="true">🧸</span>
@@ -306,7 +306,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
       <Button
         onClick={() => { setSelected(undefined); setFormKey(k => k + 1); setFormOpen(true); }}
         size="icon"
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg sm:hidden"
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg sm:hidden safe-bottom-margin"
         aria-label="Neues Plüschtier"
       >
         <Plus className="h-6 w-6" />

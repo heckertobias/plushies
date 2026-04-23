@@ -4,7 +4,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-1">{children}</main>
-      <footer className="border-t py-4 px-6">
+      <footer className="border-t py-4 px-6 safe-bottom">
         <p className="text-center text-xs text-muted-foreground">
           © {year}{" "}
           <a
