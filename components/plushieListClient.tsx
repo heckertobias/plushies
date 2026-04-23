@@ -16,6 +16,7 @@ import dayjs from "dayjs";
 import { photoUrl, parseTags } from "@/lib/utils";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useSwipeToDismiss } from "@/hooks/useSwipeToDismiss";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 
 const PAGE_SIZE = 25;
 const DEBOUNCE_MS = 250;
@@ -154,6 +155,30 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
 
   const isEmpty = totalCount === 0;
   const baseIsEmpty = allPlushies.length === 0;
+
+  function navigateDetail(direction: "prev" | "next") {
+    if (!expand) return;
+    const currentIdx = flatList.findIndex((f) => f.plushie.id === expand.plushie.id);
+    if (currentIdx === -1) return;
+    const newIdx = direction === "next" ? currentIdx + 1 : currentIdx - 1;
+    if (newIdx < 0 || newIdx >= flatList.length) return;
+    const newPlushie = flatList[newIdx]?.plushie;
+    if (!newPlushie) return;
+    setExpand((prev) => prev ? { ...prev, plushie: newPlushie } : prev);
+  }
+
+  const currentIdx = expand ? flatList.findIndex((f) => f.plushie.id === expand.plushie.id) : -1;
+  const canSwipePrev = currentIdx > 0;
+  const canSwipeNext = currentIdx >= 0 && currentIdx < flatList.length - 1;
+
+  useSwipeNavigation(contentRef, {
+    onSwipeLeft: () => navigateDetail("next"),
+    onSwipeRight: () => navigateDetail("prev"),
+    canSwipeLeft: canSwipeNext,
+    canSwipeRight: canSwipePrev,
+    enabled: isOpen && !!expand,
+    gestureLockRef,
+  });
 
   function handleSaved() {
     setFormOpen(false);
