@@ -61,6 +61,16 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
   const contentRef = useRef<HTMLDivElement>(null);
   const gestureLockRef = useRef<"none" | "horizontal" | "vertical">("none");
 
+  const closeDetail = useCallback((skipAnimation = false) => {
+    if (skipAnimation) {
+      setExpand(null);
+      setIsOpen(false);
+    } else {
+      setIsOpen(false);
+      setTimeout(() => setExpand(null), 380);
+    }
+  }, []);
+
   const handleRefresh = useCallback(() => {
     startTransition(() => router.refresh());
   }, [router]);
@@ -218,16 +228,6 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
     });
     setIsOpen(false);
     requestAnimationFrame(() => requestAnimationFrame(() => setIsOpen(true)));
-  }
-
-  function closeDetail(skipAnimation = false) {
-    if (skipAnimation) {
-      setExpand(null);
-      setIsOpen(false);
-    } else {
-      setIsOpen(false);
-      setTimeout(() => setExpand(null), 380);
-    }
   }
 
   function openEdit(p: Plushie) {

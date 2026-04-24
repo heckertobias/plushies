@@ -35,7 +35,6 @@ export function useSwipeToDismiss(
       card.style.transform = `translateY(${offsetY}px) scale(${scale})`;
       card.style.transition = "none";
 
-      // Sync backdrop opacity
       const backdrop = card.previousElementSibling as HTMLElement | null;
       if (backdrop) {
         const vh = window.innerHeight;
@@ -57,56 +56,67 @@ export function useSwipeToDismiss(
       }
     }
 
-    function onPointerDown(e: PointerEvent) {
-      if (!enabled || e.button !== 0) return;
+    function onTouchStart(e: TouchEvent) {
+      if (!enabled || e.touches.length !== 1) return;
       const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
       if (scrollTop > 1) return;
 
-      startYRef.current = e.clientY;
-      startXRef.current = e.clientX;
+      const touch = e.touches[0]!;
+      startYRef.current = touch.clientY;
+      startXRef.current = touch.clientX;
       startTimeRef.current = Date.now();
       trackingRef.current = true;
       isDraggingRef.current = false;
     }
 
-    function onPointerMove(e: PointerEvent) {
+    function onTouchMove(e: TouchEvent) {
       if (!trackingRef.current) return;
 
-      const deltaY = e.clientY - startYRef.current;
-      const deltaX = e.clientX - startXRef.current;
+      if (e.touches.length !== 1) {
+        trackingRef.current = false;
+        isDraggingRef.current = false;
+        gestureLockRef.current = "none";
+        resetTransform(true);
+        return;
+      }
+
+      const touch = e.touches[0]!;
+      const deltaY = touch.clientY - startYRef.current;
+      const deltaX = touch.clientX - startXRef.current;
       const absX = Math.abs(deltaX);
       const absY = Math.abs(deltaY);
 
-      // Respect gesture lock
       if (gestureLockRef.current === "horizontal") {
         trackingRef.current = false;
         return;
       }
 
-      // Direction decision within dead zone
       if (!isDraggingRef.current) {
+        // preventDefault early while gesture is vertical-leaning and at scrollTop=0
+        // so iOS can't claim the gesture before we commit to it.
+        const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
+        if (scrollTop === 0 && deltaY > 0 && absY >= absX) {
+          e.preventDefault();
+        }
+
         if (absX < DEAD_ZONE && absY < DEAD_ZONE) return;
 
         if (absX > absY) {
-          // Horizontal wins — let other hook take it
           trackingRef.current = false;
           return;
         }
 
         if (deltaY <= 0) {
-          // Upward — not a dismiss gesture
           trackingRef.current = false;
           return;
         }
 
-        // Vertical down wins
         isDraggingRef.current = true;
         gestureLockRef.current = "vertical";
       }
 
       e.preventDefault();
 
-      // Check scroll position again — user might have scrolled
       const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
       if (scrollTop > 1) {
         trackingRef.current = false;
@@ -120,7 +130,7 @@ export function useSwipeToDismiss(
       applyTransform(offsetY);
     }
 
-    function onPointerUp(e: PointerEvent) {
+    function onTouchEnd(e: TouchEvent) {
       if (!trackingRef.current || !isDraggingRef.current) {
         trackingRef.current = false;
         gestureLockRef.current = "none";
@@ -131,12 +141,12 @@ export function useSwipeToDismiss(
       isDraggingRef.current = false;
       gestureLockRef.current = "none";
 
-      const deltaY = e.clientY - startYRef.current;
+      const touch = e.changedTouches[0]!;
+      const deltaY = touch.clientY - startYRef.current;
       const elapsed = Date.now() - startTimeRef.current;
       const velocity = elapsed > 0 ? deltaY / elapsed : 0;
 
       if (deltaY > DISMISS_THRESHOLD || velocity > DISMISS_VELOCITY) {
-        // Animate card out, then dismiss
         if (card) {
           card.style.transition = "transform 0.25s ease-in";
           card.style.transform = `translateY(${window.innerHeight}px)`;
@@ -152,7 +162,7 @@ export function useSwipeToDismiss(
       }
     }
 
-    function onPointerCancel() {
+    function onTouchCancel() {
       if (!trackingRef.current) return;
       trackingRef.current = false;
       isDraggingRef.current = false;
@@ -160,16 +170,16 @@ export function useSwipeToDismiss(
       resetTransform(true);
     }
 
-    card.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
+    card.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchCancel);
 
     return () => {
-      card.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerCancel);
+      card.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchCancel);
     };
   }, [enabled, onDismiss, gestureLockRef, scrollContainerRef, cardRef]);
 }
