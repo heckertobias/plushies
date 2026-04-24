@@ -98,6 +98,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=raw,value=latest
 
       - name: Create and push multi-arch manifest
         working-directory: /tmp/digests
