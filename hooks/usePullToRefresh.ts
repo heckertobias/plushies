@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useCallback } from "react";
 
 const RESISTANCE = 0.4;
 const COMMIT_THRESHOLD = 64;
@@ -12,19 +12,49 @@ interface Options {
 }
 
 interface Result {
-  pullDistance: number;
-  isPulling: boolean;
+  indicatorRef: (el: HTMLDivElement | null) => void;
+  iconWrapperRef: (el: HTMLDivElement | null) => void;
 }
 
 export function usePullToRefresh({ onRefresh, isRefreshing, enabled }: Options): Result {
-  const [pullDistance, setPullDistance] = useState(0);
-  const [isPulling, setIsPulling] = useState(false);
+  const indicatorElRef = useRef<HTMLDivElement | null>(null);
+  const iconWrapperElRef = useRef<HTMLDivElement | null>(null);
 
   const startYRef = useRef(0);
   const trackingRef = useRef(false);
   const committedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const pullDistRef = useRef(0);
+
+  const indicatorRef = useCallback((el: HTMLDivElement | null) => {
+    indicatorElRef.current = el;
+  }, []);
+
+  const iconWrapperRef = useCallback((el: HTMLDivElement | null) => {
+    iconWrapperElRef.current = el;
+  }, []);
 
   useEffect(() => {
+    function applyPull(dist: number) {
+      const indicator = indicatorElRef.current;
+      const iconWrapper = iconWrapperElRef.current;
+      if (!indicator || !iconWrapper) return;
+      indicator.style.transition = "none";
+      indicator.style.height = dist + "px";
+      iconWrapper.style.transform = `rotate(${dist * 4}deg)`;
+      iconWrapper.style.opacity = String(Math.min(dist / 48, 1));
+    }
+
+    function resetPull(animate: boolean) {
+      const indicator = indicatorElRef.current;
+      const iconWrapper = iconWrapperElRef.current;
+      if (!indicator || !iconWrapper) return;
+      indicator.style.transition = animate ? "height 0.3s ease" : "none";
+      indicator.style.height = "0px";
+      iconWrapper.style.transform = "";
+      iconWrapper.style.opacity = "0";
+    }
+
     function onTouchStart(e: TouchEvent) {
       if (!enabled || isRefreshing) return;
       const scrollY = window.scrollY ?? document.documentElement.scrollTop;
@@ -34,6 +64,7 @@ export function usePullToRefresh({ onRefresh, isRefreshing, enabled }: Options):
       startYRef.current = touch.clientY;
       trackingRef.current = true;
       committedRef.current = false;
+      pullDistRef.current = 0;
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -41,39 +72,48 @@ export function usePullToRefresh({ onRefresh, isRefreshing, enabled }: Options):
       const touch = e.touches[0];
       if (!touch) return;
 
-      // Stop tracking if user scrolled down
       const scrollY = window.scrollY ?? document.documentElement.scrollTop;
       if (scrollY > 1) {
         trackingRef.current = false;
-        setPullDistance(0);
-        setIsPulling(false);
+        pullDistRef.current = 0;
+        resetPull(true);
         return;
       }
 
       const deltaY = touch.clientY - startYRef.current;
       if (deltaY <= 0) {
-        setPullDistance(0);
-        setIsPulling(false);
+        pullDistRef.current = 0;
+        resetPull(false);
         return;
       }
 
       e.preventDefault();
       const dist = Math.min(deltaY * RESISTANCE, COMMIT_THRESHOLD * 2);
-      setPullDistance(dist);
-      setIsPulling(true);
+      pullDistRef.current = dist;
+
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        applyPull(pullDistRef.current);
+        rafRef.current = null;
+      });
     }
 
     function onTouchEnd() {
       if (!trackingRef.current) return;
       trackingRef.current = false;
 
-      if (pullDistance >= COMMIT_THRESHOLD && !committedRef.current) {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      if (pullDistRef.current >= COMMIT_THRESHOLD && !committedRef.current) {
         committedRef.current = true;
         onRefresh();
       }
 
-      setPullDistance(0);
-      setIsPulling(false);
+      pullDistRef.current = 0;
+      resetPull(true);
     }
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -86,8 +126,9 @@ export function usePullToRefresh({ onRefresh, isRefreshing, enabled }: Options):
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [enabled, isRefreshing, onRefresh, pullDistance]);
+  }, [enabled, isRefreshing, onRefresh]);
 
-  return { pullDistance, isPulling };
+  return { indicatorRef, iconWrapperRef };
 }

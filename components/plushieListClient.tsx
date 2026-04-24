@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef, useCallback } from "react";
+import { useState, useTransition, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import SummaryCard from "@/components/summaryCard";
 import PlushieForm from "@/components/plushieForm";
@@ -65,7 +65,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
     startTransition(() => router.refresh());
   }, [router]);
 
-  const { pullDistance, isPulling } = usePullToRefresh({
+  const { indicatorRef, iconWrapperRef } = usePullToRefresh({
     onRefresh: handleRefresh,
     isRefreshing: isPending,
     enabled: !expand && !formOpen,
@@ -105,38 +105,42 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [router]);
 
-  // Derive active display list
-  const isSearching = debouncedQuery.trim().length > 0;
-  const filtering = isFilterActive(filters);
-  const filterCount = activeFilterCount(filters);
+  // Derive active display list (memoized — expensive recomputation only when data or filters change)
+  const filterCount = useMemo(() => activeFilterCount(filters), [filters]);
 
-  let flatSearchResults: Plushie[] | null = null;
-  let filteredGroups: GroupedPlushies | null = null;
+  const { flatList, totalCount, visibleGroups, visibleSearchResults, isSearching, filtering } = useMemo(() => {
+    const isSearching = debouncedQuery.trim().length > 0;
+    const filtering = isFilterActive(filters);
 
-  if (isSearching) {
-    const base = filtering ? filterPlushies(allPlushies, filters) : allPlushies;
-    flatSearchResults = searchPlushies(debouncedQuery, base);
-  } else if (filtering) {
-    const filtered = filterPlushies(allPlushies, filters);
-    filteredGroups = groupPlushies(filtered, dayjs());
-  }
+    let flatSearchResults: Plushie[] | null = null;
+    let filteredGroups: GroupedPlushies | null = null;
 
-  // Build flat list for infinite scroll
-  const activeGroups: GroupedPlushies = filteredGroups ?? groups;
-  const flatList: { group: Group; plushie: Plushie }[] = flatSearchResults
-    ? flatSearchResults.map((p) => ({ group: "Später" as Group, plushie: p }))
-    : GROUP_ORDER.flatMap((g) => activeGroups[g].map((p) => ({ group: g, plushie: p })));
+    if (isSearching) {
+      const base = filtering ? filterPlushies(allPlushies, filters) : allPlushies;
+      flatSearchResults = searchPlushies(debouncedQuery, base);
+    } else if (filtering) {
+      const filtered = filterPlushies(allPlushies, filters);
+      filteredGroups = groupPlushies(filtered, dayjs());
+    }
 
-  const totalCount = flatList.length;
-  const visibleFlat = flatList.slice(0, visibleCount);
+    const activeGroups: GroupedPlushies = filteredGroups ?? groups;
+    const flatList: { group: Group; plushie: Plushie }[] = flatSearchResults
+      ? flatSearchResults.map((p) => ({ group: "Später" as Group, plushie: p }))
+      : GROUP_ORDER.flatMap((g) => activeGroups[g].map((p) => ({ group: g, plushie: p })));
 
-  const visibleGroups = GROUP_ORDER.reduce<Partial<Record<Group, Plushie[]>>>((acc, g) => {
-    const items = visibleFlat.filter((x) => x.group === g).map((x) => x.plushie);
-    if (items.length > 0) acc[g] = items;
-    return acc;
-  }, {});
+    const totalCount = flatList.length;
+    const visibleFlat = flatList.slice(0, visibleCount);
 
-  const visibleSearchResults = flatSearchResults ? visibleFlat.map((x) => x.plushie) : null;
+    const visibleGroups = GROUP_ORDER.reduce<Partial<Record<Group, Plushie[]>>>((acc, g) => {
+      const items = visibleFlat.filter((x) => x.group === g).map((x) => x.plushie);
+      if (items.length > 0) acc[g] = items;
+      return acc;
+    }, {});
+
+    const visibleSearchResults = flatSearchResults ? visibleFlat.map((x) => x.plushie) : null;
+
+    return { flatList, totalCount, visibleGroups, visibleSearchResults, isSearching, filtering };
+  }, [debouncedQuery, filters, allPlushies, groups, visibleCount]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -306,21 +310,16 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
         </div>
       </div>
 
-      {/* Pull-to-refresh indicator */}
-      {(isPulling || isPending) && (
-        <div
-          className="flex items-end justify-center overflow-hidden transition-[height] duration-300"
-          style={{ height: isPulling ? pullDistance : isPending ? 48 : 0 }}
-        >
-          <RefreshCw
-            className={`h-5 w-5 mb-2 text-muted-foreground ${isPending ? "animate-spin" : ""}`}
-            style={{
-              transform: isPulling ? `rotate(${pullDistance * 4}deg)` : undefined,
-              opacity: Math.min(pullDistance / 48, 1),
-            }}
-          />
+      {/* Pull-to-refresh indicator — always mounted; height/opacity driven by hook via DOM refs */}
+      <div
+        ref={indicatorRef}
+        className="flex items-end justify-center overflow-hidden"
+        style={{ height: isPending ? 48 : 0 }}
+      >
+        <div ref={iconWrapperRef} className="mb-2 text-muted-foreground" style={{ opacity: isPending ? 1 : 0 }}>
+          <RefreshCw className={`h-5 w-5 ${isPending ? "animate-spin" : ""}`} />
         </div>
-      )}
+      </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Result count when searching/filtering */}

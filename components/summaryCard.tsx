@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 type Props = {
   name: string;
   birthday: string;
@@ -13,7 +15,7 @@ function avatarInitials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Props) {
+function SummaryCard({ name, birthday, avatarUrl, onClick }: Props) {
   return (
     <div
       role="button"
@@ -51,3 +53,9 @@ export default function SummaryCard({ name, birthday, avatarUrl, onClick }: Prop
     </div>
   );
 }
+
+export default memo(SummaryCard, (prev, next) =>
+  prev.name === next.name &&
+  prev.birthday === next.birthday &&
+  prev.avatarUrl === next.avatarUrl
+);
