@@ -60,6 +60,7 @@ function classify(birthday: string, today: Dayjs): Group {
 }
 
 export function groupPlushies(allPlushies: Plushie[], today: Dayjs = dayjs()): GroupedPlushies {
+  today = today.startOf("day");
   const groups: GroupedPlushies = {
     Heute: [],
     Morgen: [],

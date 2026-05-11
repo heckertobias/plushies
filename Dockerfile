@@ -19,6 +19,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV TZ=Europe/Berlin
 
 RUN apk add --no-cache su-exec && \
     addgroup --system --gid 1001 nodejs && \
