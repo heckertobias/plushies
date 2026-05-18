@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       summary: `🎂 ${p.name}`,
       description: p.origin ? `Herkunft: ${p.origin}` : undefined,
       allDay: true,
-      start: new Date(year!, month! - 1, day!),
+      start: new Date(Date.UTC(year!, month! - 1, day!)),
       repeating: { freq: ICalEventRepeatingFreq.YEARLY },
     });
   }
