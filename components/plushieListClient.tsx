@@ -169,7 +169,9 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
 
   const isEmpty = totalCount === 0;
   const baseIsEmpty = allPlushies.length === 0;
-  const subtitle = `Geburtstage im Blick · ${allPlushies.length} ${allPlushies.length === 1 ? "Plüschie" : "Plüschies"}`;
+  const plushieWord = allPlushies.length === 1 ? "Plüschie" : "Plüschies";
+  const subtitle = `Geburtstage im Blick · ${allPlushies.length} ${plushieWord}`;
+  const subtitleMobile = `${allPlushies.length} ${plushieWord}`;
 
   function navigateDetail(direction: "prev" | "next") {
     if (!expand) return;
@@ -285,7 +287,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
             <span className="text-3xl leading-none" aria-hidden="true">🧸</span>
             <div className="flex-1">
               <h1 className="text-lg font-bold leading-tight">Plüschie-Kalender</h1>
-              <p className="text-xs text-muted-foreground leading-tight">{subtitle}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{subtitleMobile}</p>
             </div>
             <Button
               variant="ghost"
