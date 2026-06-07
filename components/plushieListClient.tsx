@@ -169,6 +169,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
 
   const isEmpty = totalCount === 0;
   const baseIsEmpty = allPlushies.length === 0;
+  const subtitle = `Geburtstage im Blick · ${allPlushies.length} ${allPlushies.length === 1 ? "Plüschie" : "Plüschies"}`;
 
   function navigateDetail(direction: "prev" | "next") {
     if (!expand) return;
@@ -261,7 +262,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
           <span className="text-2xl leading-none shrink-0" aria-hidden="true">🧸</span>
           <div className="shrink-0">
             <h1 className="text-sm font-bold leading-tight">Plüschie-Kalender</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
+            <p className="text-xs text-muted-foreground leading-tight">{subtitle}</p>
           </div>
           <div className="flex-1">
             <SearchBar
@@ -284,7 +285,7 @@ export default function PlushieListClient({ groups, allPlushies, allNames, allTa
             <span className="text-3xl leading-none" aria-hidden="true">🧸</span>
             <div className="flex-1">
               <h1 className="text-lg font-bold leading-tight">Plüschie-Kalender</h1>
-              <p className="text-xs text-muted-foreground leading-tight">Geburtstage im Blick</p>
+              <p className="text-xs text-muted-foreground leading-tight">{subtitle}</p>
             </div>
             <Button
               variant="ghost"
