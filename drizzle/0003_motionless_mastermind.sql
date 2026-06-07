@@ -6,6 +6,4 @@ CREATE TABLE `push_subscriptions` (
 	`created_at` text NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `push_subscriptions_endpoint_unique` ON `push_subscriptions` (`endpoint`);--> statement-breakpoint
-ALTER TABLE `plushies` ADD `original_photo_path` text;--> statement-breakpoint
-ALTER TABLE `plushies` ADD `tags` text;
+CREATE UNIQUE INDEX `push_subscriptions_endpoint_unique` ON `push_subscriptions` (`endpoint`);
