@@ -4,6 +4,6 @@ import { sendBadgePushToAll } from "@/lib/push";
 // Triggers an immediate badge push to all subscriptions.
 // Useful for testing without waiting for midnight.
 export async function POST() {
-  await sendBadgePushToAll();
+  await sendBadgePushToAll({ force: true });
   return NextResponse.json({ ok: true });
 }

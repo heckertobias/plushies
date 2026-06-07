@@ -20,7 +20,7 @@ function ensureVapid() {
   return true;
 }
 
-export async function sendBadgePushToAll() {
+export async function sendBadgePushToAll({ force = false }: { force?: boolean } = {}) {
   if (!ensureVapid()) {
     console.warn("[push] VAPID not configured – skipping badge push");
     return;
@@ -30,7 +30,8 @@ export async function sendBadgePushToAll() {
   const count = countTodaysBirthdays(all, dayjs());
 
   // No push on days with no birthdays → avoids annoying "0" notifications
-  if (count === 0) return;
+  // (force=true bypasses this for the test endpoint)
+  if (count === 0 && !force) return;
 
   const subs = await db.select().from(pushSubscriptions);
   if (subs.length === 0) return;
