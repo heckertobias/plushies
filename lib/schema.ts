@@ -1,5 +1,15 @@
 import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  id: int().primaryKey({ autoIncrement: true }),
+  endpoint: text().notNull().unique(),
+  p256dh: text().notNull(),
+  auth: text().notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
 export const plushies = sqliteTable("plushies", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),

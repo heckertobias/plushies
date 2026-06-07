@@ -59,6 +59,11 @@ function classify(birthday: string, today: Dayjs): Group {
   return "Später";
 }
 
+export function countTodaysBirthdays(allPlushies: Plushie[], today: Dayjs = dayjs()): number {
+  today = today.startOf("day");
+  return allPlushies.filter((p) => nextBirthday(p.birthday, today).diff(today, "day") === 0).length;
+}
+
 export function groupPlushies(allPlushies: Plushie[], today: Dayjs = dayjs()): GroupedPlushies {
   today = today.startOf("day");
   const groups: GroupedPlushies = {
