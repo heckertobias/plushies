@@ -20,7 +20,7 @@ export default async function Page() {
 
   return (
     <>
-      <BadgeManager todayCount={groups.Heute.length} vapidPublicKey={vapidPublicKey} />
+      <BadgeManager vapidPublicKey={vapidPublicKey} />
       <PlushieListClient groups={groups} allPlushies={all} allNames={allNames} allTags={allTags} />
     </>
   );

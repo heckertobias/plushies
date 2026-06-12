@@ -34,7 +34,7 @@ async function setAppState(key: string, value: string): Promise<void> {
 
 export type SendBadgePushResult = {
   vapidConfigured: boolean;
-  /** Today's birthday count (0 if none – a "next birthday" hint is sent instead). */
+  /** Today's birthday count. */
   count: number;
   subscriptionCount: number;
   sent: number;
@@ -42,11 +42,14 @@ export type SendBadgePushResult = {
 };
 
 /**
- * Sends the daily badge push to all subscribers: the birthday count (and updates the app
- * badge) on days with birthdays, or a friendly "next birthday" hint that clears the badge
- * on days without. Always sends exactly one push per call – callers control frequency.
+ * Sends the badge push (birthday count + app badge) to all subscribers. On days without
+ * birthdays nothing is sent – the badge is cleared client-side when the PWA is opened.
+ * `sendWhenEmpty` (used by the test endpoint) forces a push anyway, with a "next birthday"
+ * hint as the body.
  */
-export async function sendBadgePushToAll(): Promise<SendBadgePushResult> {
+export async function sendBadgePushToAll(options?: {
+  sendWhenEmpty?: boolean;
+}): Promise<SendBadgePushResult> {
   if (!ensureVapid()) {
     console.warn("[push] VAPID not configured – skipping badge push");
     return { vapidConfigured: false, count: 0, subscriptionCount: 0, sent: 0, removed: 0 };
@@ -55,6 +58,11 @@ export async function sendBadgePushToAll(): Promise<SendBadgePushResult> {
   const all = await db.select().from(plushies);
   const today = dayjs();
   const count = countTodaysBirthdays(all, today);
+
+  if (count === 0 && !options?.sendWhenEmpty) {
+    console.log("[push] no birthdays today – skipping");
+    return { vapidConfigured: true, count: 0, subscriptionCount: 0, sent: 0, removed: 0 };
+  }
 
   const subs = await db.select().from(pushSubscriptions);
   if (subs.length === 0) {

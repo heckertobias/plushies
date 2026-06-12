@@ -1,30 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Send } from "lucide-react";
+import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 type Props = {
-  todayCount: number;
   vapidPublicKey: string;
 };
 
-type BadgeStatus = {
-  vapidConfigured: boolean;
-  subscriptionCount: number;
-  todayCount: number;
-  lastSentDate: string | null;
-  version: string;
-};
-
-type TestPushResult = {
-  vapidConfigured: boolean;
-  count: number;
-  subscriptionCount: number;
-  sent: number;
-  removed: number;
-};
+/** localStorage key remembering that the user dismissed the activation prompt ("Später"). */
+const PUSH_PROMPT_DISMISSED_KEY = "pushPromptDismissed";
 
 /** Converts a URL-safe base64 string to Uint8Array (required for VAPID applicationServerKey). */
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
@@ -37,6 +23,21 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+/**
+ * Rejects with a descriptive error if `promise` doesn't settle within `ms`. iOS's
+ * pushManager.subscribe() (or serviceWorker.ready) can hang forever instead of
+ * resolving/rejecting – without this, that leaves the tap handler's `finally` (which
+ * re-enables the button) never running, so the icon stays permanently disabled.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Zeitüberschreitung bei ${label} (${ms / 1000}s)`)), ms),
+    ),
+  ]);
 }
 
 /**
@@ -73,21 +74,6 @@ async function healExistingSubscription(): Promise<boolean> {
     console.error("[BadgeManager] subscription heal failed", err);
   }
   return true;
-}
-
-/**
- * Rejects with a descriptive error if `promise` doesn't settle within `ms`. iOS's
- * pushManager.subscribe() (or serviceWorker.ready) can hang forever instead of
- * resolving/rejecting – without this, that leaves the tap handler's `finally` (which
- * re-enables the button) never running, so the icon stays permanently disabled.
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`Zeitüberschreitung bei ${label} (${ms / 1000}s)`)), ms),
-    ),
-  ]);
 }
 
 /**
@@ -142,41 +128,23 @@ async function ensureSubscribed(
   } catch (err) {
     const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error("[BadgeManager] subscribe failed", err);
-
-    // Dump the browser's service worker registry – if serviceWorker.ready hangs, this is
-    // visible local state (no network involved) that explains why, without remote debugging.
-    let diag: string | undefined;
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      diag =
-        `controller=${!!navigator.serviceWorker.controller}, regs=${regs.length}` +
-        regs
-          .map(
-            (r) =>
-              ` [scope=${r.scope} active=${r.active?.state ?? "-"} installing=${r.installing?.state ?? "-"} waiting=${r.waiting?.state ?? "-"}]`,
-          )
-          .join("");
-    } catch (diagErr) {
-      diag = `diag failed: ${diagErr instanceof Error ? diagErr.message : String(diagErr)}`;
-    }
-
-    toast.error(`Abonnieren fehlgeschlagen: ${detail}`, { description: diag, duration: 20000 });
+    toast.error(`Abonnieren fehlgeschlagen: ${detail}`);
   }
 
   return permission;
 }
 
-export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
+export default function BadgeManager({ vapidPublicKey }: Props) {
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [status, setStatus] = useState<BadgeStatus | null>(null);
   // Whether THIS device holds a push subscription (server count is global across devices,
   // so it can't tell a new device that it still needs to subscribe).
   const [hasLocalSubscription, setHasLocalSubscription] = useState<boolean | null>(null);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  // The activation prompt should appear at most once per app start.
+  const promptShownRef = useRef(false);
 
-  // Register service worker and sync badge on mount / whenever todayCount changes
+  // Register service worker on mount
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
@@ -199,16 +167,12 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
       .catch(() => {});
   }, []);
 
-  // Update badge whenever todayCount changes (also runs on visibility restore via router.refresh)
+  // The badge is set by the birthday push (sw.js); opening the app means it was seen,
+  // so clear it – no daily "clear" push needed on days without birthdays.
   useEffect(() => {
-    if (!("setAppBadge" in navigator)) return;
-
-    if (todayCount > 0) {
-      navigator.setAppBadge(todayCount).catch(() => {});
-    } else {
-      navigator.clearAppBadge().catch(() => {});
-    }
-  }, [todayCount]);
+    if (!("clearAppBadge" in navigator)) return;
+    navigator.clearAppBadge().catch(() => {});
+  }, []);
 
   // Track notification permission state
   useEffect(() => {
@@ -216,32 +180,57 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     setPermissionState(Notification.permission);
   }, []);
 
-  // Once notifications are allowed: heal a subscription that's lost server-side (e.g. past
-  // migration error) without a new permission prompt, then fetch a diagnostic snapshot for
-  // the status display. Does NOT call pushManager.subscribe() – that needs a user gesture
-  // (see ensureSubscribed, called from the bell tap).
+  // Once the permission state is known: heal a subscription that's lost server-side (without
+  // a new permission prompt), and – if this device isn't subscribed and the user hasn't
+  // dismissed it before – proactively offer activation via a toast. The toast's button tap
+  // is the user gesture iOS requires for pushManager.subscribe() (see ensureSubscribed).
   useEffect(() => {
-    if (permissionState !== "granted" || !vapidPublicKey) return;
+    if (permissionState === null || permissionState === "denied" || !vapidPublicKey) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
     let cancelled = false;
 
     (async () => {
-      const hasSub = await healExistingSubscription();
-      if (!cancelled) setHasLocalSubscription(hasSub);
-
-      try {
-        const res = await fetch("/api/push/status");
-        const data: BadgeStatus = await res.json();
-        if (!cancelled) setStatus(data);
-      } catch {
-        // status display is best-effort
+      let hasSub = false;
+      if (permissionState === "granted") {
+        hasSub = await healExistingSubscription();
       }
+      if (cancelled) return;
+      setHasLocalSubscription(hasSub);
+
+      if (hasSub || promptShownRef.current) return;
+      try {
+        if (localStorage.getItem(PUSH_PROMPT_DISMISSED_KEY)) return;
+      } catch {
+        return;
+      }
+      promptShownRef.current = true;
+
+      toast("🔔 Geburtstags-Erinnerungen aktivieren?", {
+        duration: Infinity,
+        action: {
+          label: "Aktivieren",
+          onClick: () => {
+            void handleEnableBadge();
+          },
+        },
+        cancel: {
+          label: "Später",
+          onClick: () => {
+            try {
+              localStorage.setItem(PUSH_PROMPT_DISMISSED_KEY, "1");
+            } catch {
+              // private mode etc. – prompt will simply reappear next start
+            }
+          },
+        },
+      });
     })();
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permissionState, vapidPublicKey]);
 
   async function handleEnableBadge() {
@@ -257,45 +246,11 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
           const sub = await registrationRef.current?.pushManager.getSubscription();
           setHasLocalSubscription(!!sub);
         } catch {
-          // leave as-is; UI falls back to showing the test button
-        }
-        try {
-          const res = await fetch("/api/push/status");
-          const data: BadgeStatus = await res.json();
-          setStatus(data);
-        } catch {
-          // status display is best-effort
+          // leave as-is; the bell stays visible for another attempt
         }
       }
     } finally {
       setIsSubscribing(false);
-    }
-  }
-
-  async function handleTestPush() {
-    setIsTesting(true);
-    try {
-      const res = await fetch("/api/push/test", { method: "POST" });
-      const result: TestPushResult = await res.json();
-
-      if (!result.vapidConfigured) {
-        toast.error("VAPID ist nicht konfiguriert – Push kann nicht gesendet werden.");
-      } else if (result.subscriptionCount === 0) {
-        toast.error("Keine Push-Abonnements vorhanden.");
-      } else {
-        toast.success(
-          `Test-Push gesendet (${result.sent}/${result.subscriptionCount} Gerät${result.subscriptionCount === 1 ? "" : "e"}).`,
-        );
-      }
-
-      setStatus((prev) =>
-        prev ? { ...prev, vapidConfigured: result.vapidConfigured, subscriptionCount: result.subscriptionCount } : prev,
-      );
-    } catch (err) {
-      console.error("[BadgeManager] test push failed", err);
-      toast.error("Test-Push fehlgeschlagen.");
-    } finally {
-      setIsTesting(false);
     }
   }
 
@@ -305,54 +260,30 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     "Notification" in window &&
     "PushManager" in window;
 
-  // Show the bell to (re-)activate notifications: either permission hasn't been decided yet,
-  // or it's granted but THIS device holds no subscription (the server count is global, so a
-  // second device with previously granted permission would otherwise never get the bell) –
-  // tapping it re-runs the subscribe flow inside a user gesture, which iOS requires.
+  // Manual fallback (e.g. after dismissing the prompt with "Später"): show the bell as long
+  // as this device has no subscription – either permission hasn't been decided yet, or it's
+  // granted but no subscription exists. Tapping it runs the subscribe flow inside a user
+  // gesture, which iOS requires. Once subscribed, the component renders nothing.
   const needsSubscription = permissionState === "granted" && hasLocalSubscription === false;
   const showEnableButton = supportsPush && (permissionState === "default" || needsSubscription);
 
-  // Once enabled, default to the test-push button so the icon never disappears just because
-  // /api/push/status hasn't resolved yet (or failed) – tapping it hits /api/push/test directly.
-  const showTestButton = supportsPush && permissionState === "granted" && !needsSubscription;
-
-  if (!showEnableButton && !showTestButton) return null;
-
-  if (showEnableButton) {
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleEnableBadge}
-        disabled={isSubscribing}
-        aria-label="Geburtstags-Benachrichtigungen aktivieren"
-        title={
-          needsSubscription
-            ? "Benachrichtigungen erneut aktivieren (Abo fehlt auf dem Server)"
-            : "Geburtstags-Benachrichtigungen aktivieren"
-        }
-        className="text-muted-foreground hover:text-foreground"
-      >
-        <Bell className="h-4 w-4" />
-      </Button>
-    );
-  }
-
-  const statusText = status
-    ? `v${status.version} · ${status.vapidConfigured ? "VAPID ok" : "VAPID fehlt"} · ${status.subscriptionCount} Abo${status.subscriptionCount === 1 ? "" : "s"} · zuletzt gesendet: ${status.lastSentDate ?? "nie"}`
-    : "Status wird geladen…";
+  if (!showEnableButton) return null;
 
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={handleTestPush}
-      disabled={isTesting}
-      aria-label="Test-Push senden"
-      title={`Test-Push senden (${statusText})`}
+      onClick={handleEnableBadge}
+      disabled={isSubscribing}
+      aria-label="Geburtstags-Benachrichtigungen aktivieren"
+      title={
+        needsSubscription
+          ? "Benachrichtigungen erneut aktivieren (Abo fehlt auf diesem Gerät)"
+          : "Geburtstags-Benachrichtigungen aktivieren"
+      }
       className="text-muted-foreground hover:text-foreground"
     >
-      <Send className="h-4 w-4" />
+      <Bell className="h-4 w-4" />
     </Button>
   );
 }
