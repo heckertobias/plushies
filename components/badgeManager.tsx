@@ -59,11 +59,12 @@ async function postSubscription(subscription: PushSubscription): Promise<Respons
  * Gesture-free heal: if the browser already holds a push subscription (granted earlier,
  * possibly lost server-side), re-upsert it. Does NOT call subscribe() – on iOS that
  * requires an active user gesture, so this only ever reuses an existing subscription.
+ * Returns whether THIS device currently holds a subscription.
  */
-async function healExistingSubscription(): Promise<void> {
+async function healExistingSubscription(): Promise<boolean> {
   const reg = await navigator.serviceWorker.ready;
   const subscription = await reg.pushManager.getSubscription();
-  if (!subscription) return;
+  if (!subscription) return false;
 
   try {
     const res = await postSubscription(subscription);
@@ -71,6 +72,7 @@ async function healExistingSubscription(): Promise<void> {
   } catch (err) {
     console.error("[BadgeManager] subscription heal failed", err);
   }
+  return true;
 }
 
 /**
@@ -169,6 +171,9 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [status, setStatus] = useState<BadgeStatus | null>(null);
+  // Whether THIS device holds a push subscription (server count is global across devices,
+  // so it can't tell a new device that it still needs to subscribe).
+  const [hasLocalSubscription, setHasLocalSubscription] = useState<boolean | null>(null);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   // Register service worker and sync badge on mount / whenever todayCount changes
@@ -222,7 +227,8 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     let cancelled = false;
 
     (async () => {
-      await healExistingSubscription();
+      const hasSub = await healExistingSubscription();
+      if (!cancelled) setHasLocalSubscription(hasSub);
 
       try {
         const res = await fetch("/api/push/status");
@@ -247,6 +253,12 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
       setPermissionState(permission);
 
       if (permission === "granted") {
+        try {
+          const sub = await registrationRef.current?.pushManager.getSubscription();
+          setHasLocalSubscription(!!sub);
+        } catch {
+          // leave as-is; UI falls back to showing the test button
+        }
         try {
           const res = await fetch("/api/push/status");
           const data: BadgeStatus = await res.json();
@@ -294,10 +306,10 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     "PushManager" in window;
 
   // Show the bell to (re-)activate notifications: either permission hasn't been decided yet,
-  // or it's granted but the server has confirmed there's no subscription for this device
-  // (lost/never arrived) – tapping it re-runs the subscribe flow inside a user gesture, which
-  // iOS requires.
-  const needsSubscription = permissionState === "granted" && status?.subscriptionCount === 0;
+  // or it's granted but THIS device holds no subscription (the server count is global, so a
+  // second device with previously granted permission would otherwise never get the bell) –
+  // tapping it re-runs the subscribe flow inside a user gesture, which iOS requires.
+  const needsSubscription = permissionState === "granted" && hasLocalSubscription === false;
   const showEnableButton = supportsPush && (permissionState === "default" || needsSubscription);
 
   // Once enabled, default to the test-push button so the icon never disappears just because
