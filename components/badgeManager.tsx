@@ -15,6 +15,7 @@ type BadgeStatus = {
   subscriptionCount: number;
   todayCount: number;
   lastSentDate: string | null;
+  version: string;
 };
 
 type TestPushResult = {
@@ -39,22 +40,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 }
 
 /**
- * Ensures the current device's push subscription is registered server-side. Reuses the
- * existing browser subscription if present (no extra permission prompt needed once granted)
- * and upserts it via /api/push/subscribe – safe to call repeatedly (e.g. on every app load)
- * so a subscription lost server-side (e.g. due to a past migration error) self-heals.
+ * Posts a subscription to the server (upsert). Returns the raw response so callers can
+ * surface the HTTP status on failure.
  */
-async function syncPushSubscription(vapidPublicKey: string): Promise<boolean> {
-  const reg = await navigator.serviceWorker.ready;
-  const subscription =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    }));
-
+async function postSubscription(subscription: PushSubscription): Promise<Response> {
   const json = subscription.toJSON();
-  const res = await fetch("/api/push/subscribe", {
+  return fetch("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -62,7 +53,65 @@ async function syncPushSubscription(vapidPublicKey: string): Promise<boolean> {
       keys: { p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "" },
     }),
   });
-  return res.ok;
+}
+
+/**
+ * Gesture-free heal: if the browser already holds a push subscription (granted earlier,
+ * possibly lost server-side), re-upsert it. Does NOT call subscribe() – on iOS that
+ * requires an active user gesture, so this only ever reuses an existing subscription.
+ */
+async function healExistingSubscription(): Promise<void> {
+  const reg = await navigator.serviceWorker.ready;
+  const subscription = await reg.pushManager.getSubscription();
+  if (!subscription) return;
+
+  try {
+    const res = await postSubscription(subscription);
+    if (!res.ok) console.error("[BadgeManager] subscription heal failed", res.status);
+  } catch (err) {
+    console.error("[BadgeManager] subscription heal failed", err);
+  }
+}
+
+/**
+ * Requests notification permission (if needed) and creates/registers a push subscription –
+ * must run synchronously within a user gesture (tap), as iOS requires that for
+ * pushManager.subscribe(). Shows a toast with the outcome, including which step failed.
+ */
+async function ensureSubscribed(vapidPublicKey: string): Promise<NotificationPermission> {
+  let permission = Notification.permission;
+  if (permission === "default") {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission !== "granted") {
+    if (permission === "denied") {
+      toast.error("Benachrichtigungen wurden blockiert. Bitte in den iOS-Einstellungen erlauben.");
+    }
+    return permission;
+  }
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const subscription =
+      (await reg.pushManager.getSubscription()) ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      }));
+
+    const res = await postSubscription(subscription);
+    if (!res.ok) {
+      toast.error(`Benachrichtigungen aktiviert, aber Speichern fehlgeschlagen (${res.status}).`);
+    } else {
+      toast.success("Benachrichtigungen aktiviert ✓");
+    }
+  } catch (err) {
+    console.error("[BadgeManager] subscribe failed", err);
+    toast.error("Abonnieren fehlgeschlagen. Bitte erneut versuchen.");
+  }
+
+  return permission;
 }
 
 export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
@@ -102,9 +151,10 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     setPermissionState(Notification.permission);
   }, []);
 
-  // Once notifications are allowed: (re-)sync this device's subscription server-side, then
-  // fetch a diagnostic snapshot for the test-push UI. Runs on every load while granted so a
-  // subscription lost server-side (e.g. past migration error) self-heals without user action.
+  // Once notifications are allowed: heal a subscription that's lost server-side (e.g. past
+  // migration error) without a new permission prompt, then fetch a diagnostic snapshot for
+  // the status display. Does NOT call pushManager.subscribe() – that needs a user gesture
+  // (see ensureSubscribed, called from the bell tap).
   useEffect(() => {
     if (permissionState !== "granted" || !vapidPublicKey) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
@@ -112,12 +162,7 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     let cancelled = false;
 
     (async () => {
-      try {
-        const ok = await syncPushSubscription(vapidPublicKey);
-        if (!ok) console.error("[BadgeManager] subscription sync failed (server)");
-      } catch (err) {
-        console.error("[BadgeManager] subscription sync failed", err);
-      }
+      await healExistingSubscription();
 
       try {
         const res = await fetch("/api/push/status");
@@ -138,11 +183,18 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
 
     setIsSubscribing(true);
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await ensureSubscribed(vapidPublicKey);
       setPermissionState(permission);
-      // Subscription is created/synced by the effect above once permissionState is "granted"
-    } catch (err) {
-      console.error("[BadgeManager] requestPermission failed", err);
+
+      if (permission === "granted") {
+        try {
+          const res = await fetch("/api/push/status");
+          const data: BadgeStatus = await res.json();
+          setStatus(data);
+        } catch {
+          // status display is best-effort
+        }
+      }
     } finally {
       setIsSubscribing(false);
     }
@@ -181,11 +233,16 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     "Notification" in window &&
     "PushManager" in window;
 
-  // Only show the bell when Notifications are supported and the user hasn't decided yet
-  const showEnableButton = supportsPush && permissionState === "default";
+  // Show the bell to (re-)activate notifications: either permission hasn't been decided yet,
+  // or it's granted but the server has no subscription for this device (lost/never arrived) –
+  // tapping it re-runs the subscribe flow inside a user gesture, which iOS requires.
+  const needsSubscription = permissionState === "granted" && status !== null && status.subscriptionCount === 0;
+  const showEnableButton = supportsPush && (permissionState === "default" || needsSubscription);
 
-  // Once enabled, show a small test-push button so the delivery pipeline can be verified on-device
-  const showTestButton = supportsPush && permissionState === "granted";
+  // Once enabled AND a subscription is confirmed server-side, show a test-push button so the
+  // delivery pipeline can be verified on-device.
+  const showTestButton =
+    supportsPush && permissionState === "granted" && status !== null && status.subscriptionCount > 0;
 
   if (!showEnableButton && !showTestButton) return null;
 
@@ -197,7 +254,11 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
         onClick={handleEnableBadge}
         disabled={isSubscribing}
         aria-label="Geburtstags-Benachrichtigungen aktivieren"
-        title="Geburtstags-Benachrichtigungen aktivieren"
+        title={
+          needsSubscription
+            ? "Benachrichtigungen erneut aktivieren (Abo fehlt auf dem Server)"
+            : "Geburtstags-Benachrichtigungen aktivieren"
+        }
         className="text-muted-foreground hover:text-foreground"
       >
         <Bell className="h-4 w-4" />
@@ -206,7 +267,7 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
   }
 
   const statusText = status
-    ? `${status.vapidConfigured ? "VAPID ok" : "VAPID fehlt"} · ${status.subscriptionCount} Abo${status.subscriptionCount === 1 ? "" : "s"} · zuletzt gesendet: ${status.lastSentDate ?? "nie"}`
+    ? `v${status.version} · ${status.vapidConfigured ? "VAPID ok" : "VAPID fehlt"} · ${status.subscriptionCount} Abo${status.subscriptionCount === 1 ? "" : "s"} · zuletzt gesendet: ${status.lastSentDate ?? "nie"}`
     : "Status wird geladen…";
 
   return (

@@ -4,6 +4,7 @@ import { pushSubscriptions, plushies, appState } from "@/lib/schema";
 import { countTodaysBirthdays, nextBirthdayMessage } from "@/lib/groupPlushies";
 import { eq } from "drizzle-orm";
 import dayjs from "dayjs";
+import packageJson from "@/package.json";
 
 /** app_state key storing the date (YYYY-MM-DD, server-local) the daily badge push last went out. */
 const BADGE_LAST_SENT_KEY = "badge_last_sent_date";
@@ -126,6 +127,8 @@ export type BadgeStatus = {
   subscriptionCount: number;
   todayCount: number;
   lastSentDate: string | null;
+  /** App version (from package.json) – lets the in-app status confirm which build is running. */
+  version: string;
 };
 
 /** Diagnostic snapshot for the in-app status check. */
@@ -141,5 +144,6 @@ export async function getBadgeStatus(): Promise<BadgeStatus> {
     subscriptionCount: subs.length,
     todayCount: countTodaysBirthdays(all, dayjs()),
     lastSentDate,
+    version: packageJson.version,
   };
 }
