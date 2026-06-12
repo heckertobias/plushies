@@ -114,18 +114,21 @@ async function ensureSubscribed(
   }
 
   try {
+    const reg = await withTimeout(
+      registration ? Promise.resolve(registration) : navigator.serviceWorker.ready,
+      3000,
+      "serviceWorker.ready",
+    );
+
+    // subscribe() returns the existing subscription if one with the same
+    // applicationServerKey already exists, so getSubscription() isn't needed here.
     const subscription = await withTimeout(
-      (async () => {
-        const reg = registration ?? (await navigator.serviceWorker.ready);
-        // subscribe() returns the existing subscription if one with the same
-        // applicationServerKey already exists, so getSubscription() isn't needed here.
-        return reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        });
-      })(),
+      reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      }),
       8000,
-      "Push-Registrierung",
+      "pushManager.subscribe()",
     );
 
     const res = await postSubscription(subscription);
