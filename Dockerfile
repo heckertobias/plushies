@@ -25,9 +25,11 @@ RUN apk add --no-cache su-exec && \
     addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy standalone output
+# Copy standalone output. public/ is NOT part of the standalone bundle and must be
+# copied explicitly - without it, /sw.js 404s and push registration silently fails.
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 # Copy drizzle migrations (needed at runtime for auto-migrate)
 COPY --from=builder /app/drizzle ./drizzle
