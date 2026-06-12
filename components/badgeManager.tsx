@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -77,8 +77,15 @@ async function healExistingSubscription(): Promise<void> {
  * Requests notification permission (if needed) and creates/registers a push subscription –
  * must run synchronously within a user gesture (tap), as iOS requires that for
  * pushManager.subscribe(). Shows a toast with the outcome, including which step failed.
+ *
+ * `registration` is an optionally pre-fetched `serviceWorker.ready` result: every `await`
+ * before `pushManager.subscribe()` risks losing iOS's user-gesture token, so the caller
+ * fetches it ahead of time (outside the gesture) when possible.
  */
-async function ensureSubscribed(vapidPublicKey: string): Promise<NotificationPermission> {
+async function ensureSubscribed(
+  vapidPublicKey: string,
+  registration: ServiceWorkerRegistration | null,
+): Promise<NotificationPermission> {
   let permission = Notification.permission;
   if (permission === "default") {
     permission = await Notification.requestPermission();
@@ -92,13 +99,13 @@ async function ensureSubscribed(vapidPublicKey: string): Promise<NotificationPer
   }
 
   try {
-    const reg = await navigator.serviceWorker.ready;
-    const subscription =
-      (await reg.pushManager.getSubscription()) ??
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      }));
+    const reg = registration ?? (await navigator.serviceWorker.ready);
+    // subscribe() returns the existing subscription if one with the same
+    // applicationServerKey already exists, so getSubscription() isn't needed here.
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
 
     const res = await postSubscription(subscription);
     if (!res.ok) {
@@ -107,8 +114,9 @@ async function ensureSubscribed(vapidPublicKey: string): Promise<NotificationPer
       toast.success("Benachrichtigungen aktiviert ✓");
     }
   } catch (err) {
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error("[BadgeManager] subscribe failed", err);
-    toast.error("Abonnieren fehlgeschlagen. Bitte erneut versuchen.");
+    toast.error(`Abonnieren fehlgeschlagen: ${detail}`);
   }
 
   return permission;
@@ -119,6 +127,7 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [status, setStatus] = useState<BadgeStatus | null>(null);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   // Register service worker and sync badge on mount / whenever todayCount changes
   useEffect(() => {
@@ -132,6 +141,15 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
       .catch((err) => {
         console.error("[BadgeManager] SW registration failed", err);
       });
+
+    // Pre-fetch the ready registration so the tap handler can call pushManager.subscribe()
+    // without an extra await – on iOS, awaiting serviceWorker.ready inside the gesture can
+    // itself consume the user-gesture token before subscribe() runs.
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        registrationRef.current = reg;
+      })
+      .catch(() => {});
   }, []);
 
   // Update badge whenever todayCount changes (also runs on visibility restore via router.refresh)
@@ -183,7 +201,7 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
 
     setIsSubscribing(true);
     try {
-      const permission = await ensureSubscribed(vapidPublicKey);
+      const permission = await ensureSubscribed(vapidPublicKey, registrationRef.current);
       setPermissionState(permission);
 
       if (permission === "granted") {
@@ -234,15 +252,15 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     "PushManager" in window;
 
   // Show the bell to (re-)activate notifications: either permission hasn't been decided yet,
-  // or it's granted but the server has no subscription for this device (lost/never arrived) –
-  // tapping it re-runs the subscribe flow inside a user gesture, which iOS requires.
-  const needsSubscription = permissionState === "granted" && status !== null && status.subscriptionCount === 0;
+  // or it's granted but the server has confirmed there's no subscription for this device
+  // (lost/never arrived) – tapping it re-runs the subscribe flow inside a user gesture, which
+  // iOS requires.
+  const needsSubscription = permissionState === "granted" && status?.subscriptionCount === 0;
   const showEnableButton = supportsPush && (permissionState === "default" || needsSubscription);
 
-  // Once enabled AND a subscription is confirmed server-side, show a test-push button so the
-  // delivery pipeline can be verified on-device.
-  const showTestButton =
-    supportsPush && permissionState === "granted" && status !== null && status.subscriptionCount > 0;
+  // Once enabled, default to the test-push button so the icon never disappears just because
+  // /api/push/status hasn't resolved yet (or failed) – tapping it hits /api/push/test directly.
+  const showTestButton = supportsPush && permissionState === "granted" && !needsSubscription;
 
   if (!showEnableButton && !showTestButton) return null;
 
