@@ -38,6 +38,33 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return outputArray;
 }
 
+/**
+ * Ensures the current device's push subscription is registered server-side. Reuses the
+ * existing browser subscription if present (no extra permission prompt needed once granted)
+ * and upserts it via /api/push/subscribe – safe to call repeatedly (e.g. on every app load)
+ * so a subscription lost server-side (e.g. due to a past migration error) self-heals.
+ */
+async function syncPushSubscription(vapidPublicKey: string): Promise<boolean> {
+  const reg = await navigator.serviceWorker.ready;
+  const subscription =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    }));
+
+  const json = subscription.toJSON();
+  const res = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      endpoint: json.endpoint,
+      keys: { p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "" },
+    }),
+  });
+  return res.ok;
+}
+
 export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -75,14 +102,35 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     setPermissionState(Notification.permission);
   }, []);
 
-  // Once notifications are allowed, fetch a diagnostic snapshot for the test-push UI
+  // Once notifications are allowed: (re-)sync this device's subscription server-side, then
+  // fetch a diagnostic snapshot for the test-push UI. Runs on every load while granted so a
+  // subscription lost server-side (e.g. past migration error) self-heals without user action.
   useEffect(() => {
     if (permissionState !== "granted" || !vapidPublicKey) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
-    fetch("/api/push/status")
-      .then((res) => res.json())
-      .then((data: BadgeStatus) => setStatus(data))
-      .catch(() => {});
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const ok = await syncPushSubscription(vapidPublicKey);
+        if (!ok) console.error("[BadgeManager] subscription sync failed (server)");
+      } catch (err) {
+        console.error("[BadgeManager] subscription sync failed", err);
+      }
+
+      try {
+        const res = await fetch("/api/push/status");
+        const data: BadgeStatus = await res.json();
+        if (!cancelled) setStatus(data);
+      } catch {
+        // status display is best-effort
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [permissionState, vapidPublicKey]);
 
   async function handleEnableBadge() {
@@ -92,30 +140,9 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     try {
       const permission = await Notification.requestPermission();
       setPermissionState(permission);
-      if (permission !== "granted") return;
-
-      const reg = await navigator.serviceWorker.ready;
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
-
-      const json = subscription.toJSON();
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: { p256dh: json.keys?.p256dh ?? "", auth: json.keys?.auth ?? "" },
-        }),
-      });
-
-      // Set badge immediately after subscribing
-      if (todayCount > 0) {
-        navigator.setAppBadge?.(todayCount).catch(() => {});
-      }
+      // Subscription is created/synced by the effect above once permissionState is "granted"
     } catch (err) {
-      console.error("[BadgeManager] subscribe failed", err);
+      console.error("[BadgeManager] requestPermission failed", err);
     } finally {
       setIsSubscribing(false);
     }
