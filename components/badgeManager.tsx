@@ -1,12 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   todayCount: number;
   vapidPublicKey: string;
+};
+
+type BadgeStatus = {
+  vapidConfigured: boolean;
+  subscriptionCount: number;
+  todayCount: number;
+  lastSentDate: string | null;
+};
+
+type TestPushResult = {
+  vapidConfigured: boolean;
+  count: number;
+  subscriptionCount: number;
+  sent: number;
+  removed: number;
 };
 
 /** Converts a URL-safe base64 string to Uint8Array (required for VAPID applicationServerKey). */
@@ -25,6 +41,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
   const [permissionState, setPermissionState] = useState<NotificationPermission | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [status, setStatus] = useState<BadgeStatus | null>(null);
 
   // Register service worker and sync badge on mount / whenever todayCount changes
   useEffect(() => {
@@ -56,6 +74,16 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     if (!("Notification" in window)) return;
     setPermissionState(Notification.permission);
   }, []);
+
+  // Once notifications are allowed, fetch a diagnostic snapshot for the test-push UI
+  useEffect(() => {
+    if (permissionState !== "granted" || !vapidPublicKey) return;
+
+    fetch("/api/push/status")
+      .then((res) => res.json())
+      .then((data: BadgeStatus) => setStatus(data))
+      .catch(() => {});
+  }, [permissionState, vapidPublicKey]);
 
   async function handleEnableBadge() {
     if (!("Notification" in window) || !("PushManager" in window) || !vapidPublicKey) return;
@@ -93,28 +121,78 @@ export default function BadgeManager({ todayCount, vapidPublicKey }: Props) {
     }
   }
 
-  // Only show the button when VAPID is configured, Notifications are supported,
-  // and the user hasn't granted or denied permission yet
-  const showButton =
+  async function handleTestPush() {
+    setIsTesting(true);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const result: TestPushResult = await res.json();
+
+      if (!result.vapidConfigured) {
+        toast.error("VAPID ist nicht konfiguriert – Push kann nicht gesendet werden.");
+      } else if (result.subscriptionCount === 0) {
+        toast.error("Keine Push-Abonnements vorhanden.");
+      } else {
+        toast.success(
+          `Test-Push gesendet (${result.sent}/${result.subscriptionCount} Gerät${result.subscriptionCount === 1 ? "" : "e"}).`,
+        );
+      }
+
+      setStatus((prev) =>
+        prev ? { ...prev, vapidConfigured: result.vapidConfigured, subscriptionCount: result.subscriptionCount } : prev,
+      );
+    } catch (err) {
+      console.error("[BadgeManager] test push failed", err);
+      toast.error("Test-Push fehlgeschlagen.");
+    } finally {
+      setIsTesting(false);
+    }
+  }
+
+  const supportsPush =
     !!vapidPublicKey &&
     typeof window !== "undefined" &&
     "Notification" in window &&
-    "PushManager" in window &&
-    permissionState === "default";
+    "PushManager" in window;
 
-  if (!showButton) return null;
+  // Only show the bell when Notifications are supported and the user hasn't decided yet
+  const showEnableButton = supportsPush && permissionState === "default";
+
+  // Once enabled, show a small test-push button so the delivery pipeline can be verified on-device
+  const showTestButton = supportsPush && permissionState === "granted";
+
+  if (!showEnableButton && !showTestButton) return null;
+
+  if (showEnableButton) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleEnableBadge}
+        disabled={isSubscribing}
+        aria-label="Geburtstags-Benachrichtigungen aktivieren"
+        title="Geburtstags-Benachrichtigungen aktivieren"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <Bell className="h-4 w-4" />
+      </Button>
+    );
+  }
+
+  const statusText = status
+    ? `${status.vapidConfigured ? "VAPID ok" : "VAPID fehlt"} · ${status.subscriptionCount} Abo${status.subscriptionCount === 1 ? "" : "s"} · zuletzt gesendet: ${status.lastSentDate ?? "nie"}`
+    : "Status wird geladen…";
 
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={handleEnableBadge}
-      disabled={isSubscribing}
-      aria-label="Geburtstags-Benachrichtigungen aktivieren"
-      title="Geburtstags-Benachrichtigungen aktivieren"
+      onClick={handleTestPush}
+      disabled={isTesting}
+      aria-label="Test-Push senden"
+      title={`Test-Push senden (${statusText})`}
       className="text-muted-foreground hover:text-foreground"
     >
-      <Bell className="h-4 w-4" />
+      <Send className="h-4 w-4" />
     </Button>
   );
 }

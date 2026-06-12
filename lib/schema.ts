@@ -10,6 +10,14 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
+/** Generic key-value store for small pieces of app state (e.g. scheduler bookkeeping). */
+export const appState = sqliteTable("app_state", {
+  key: text().primaryKey(),
+  value: text().notNull(),
+});
+
+export type AppState = typeof appState.$inferSelect;
+
 export const plushies = sqliteTable("plushies", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),

@@ -12,6 +12,10 @@ services:
       - AUTH_PASSWORD=${AUTH_PASSWORD}
       - SESSION_SECRET=${SESSION_SECRET}
       - ICAL_TOKEN=${ICAL_TOKEN}
+      - TZ=${TZ:-Europe/Berlin}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_SUBJECT=${VAPID_SUBJECT}
     restart: unless-stopped
 
 volumes:

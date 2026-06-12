@@ -64,6 +64,27 @@ export function countTodaysBirthdays(allPlushies: Plushie[], today: Dayjs = dayj
   return allPlushies.filter((p) => nextBirthday(p.birthday, today).diff(today, "day") === 0).length;
 }
 
+/**
+ * Friendly message for days without a birthday, pointing to the next upcoming one.
+ * Used as the push body so the daily badge-clearing push isn't just an empty "0" notification.
+ */
+export function nextBirthdayMessage(allPlushies: Plushie[], today: Dayjs = dayjs()): string {
+  today = today.startOf("day");
+
+  if (allPlushies.length === 0) {
+    return "Heute kein Geburtstag. Noch keine Plüschies im Kalender.";
+  }
+
+  const minDiff = Math.min(...allPlushies.map((p) => nextBirthday(p.birthday, today).diff(today, "day")));
+
+  let when: string;
+  if (minDiff === 1) when = "schon morgen";
+  else if (minDiff === 2) when = "übermorgen";
+  else when = `in ${minDiff} Tagen`;
+
+  return `Heute kein Geburtstag. Aber ${when} dürfen die nächsten Plüschies feiern.`;
+}
+
 export function groupPlushies(allPlushies: Plushie[], today: Dayjs = dayjs()): GroupedPlushies {
   today = today.startOf("day");
   const groups: GroupedPlushies = {
