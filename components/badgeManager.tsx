@@ -74,6 +74,21 @@ async function healExistingSubscription(): Promise<void> {
 }
 
 /**
+ * Rejects with a descriptive error if `promise` doesn't settle within `ms`. iOS's
+ * pushManager.subscribe() (or serviceWorker.ready) can hang forever instead of
+ * resolving/rejecting – without this, that leaves the tap handler's `finally` (which
+ * re-enables the button) never running, so the icon stays permanently disabled.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Zeitüberschreitung bei ${label} (${ms / 1000}s)`)), ms),
+    ),
+  ]);
+}
+
+/**
  * Requests notification permission (if needed) and creates/registers a push subscription –
  * must run synchronously within a user gesture (tap), as iOS requires that for
  * pushManager.subscribe(). Shows a toast with the outcome, including which step failed.
@@ -99,13 +114,19 @@ async function ensureSubscribed(
   }
 
   try {
-    const reg = registration ?? (await navigator.serviceWorker.ready);
-    // subscribe() returns the existing subscription if one with the same
-    // applicationServerKey already exists, so getSubscription() isn't needed here.
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    });
+    const subscription = await withTimeout(
+      (async () => {
+        const reg = registration ?? (await navigator.serviceWorker.ready);
+        // subscribe() returns the existing subscription if one with the same
+        // applicationServerKey already exists, so getSubscription() isn't needed here.
+        return reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+      })(),
+      8000,
+      "Push-Registrierung",
+    );
 
     const res = await postSubscription(subscription);
     if (!res.ok) {
