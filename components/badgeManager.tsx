@@ -140,7 +140,25 @@ async function ensureSubscribed(
   } catch (err) {
     const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error("[BadgeManager] subscribe failed", err);
-    toast.error(`Abonnieren fehlgeschlagen: ${detail}`);
+
+    // Dump the browser's service worker registry – if serviceWorker.ready hangs, this is
+    // visible local state (no network involved) that explains why, without remote debugging.
+    let diag: string | undefined;
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      diag =
+        `controller=${!!navigator.serviceWorker.controller}, regs=${regs.length}` +
+        regs
+          .map(
+            (r) =>
+              ` [scope=${r.scope} active=${r.active?.state ?? "-"} installing=${r.installing?.state ?? "-"} waiting=${r.waiting?.state ?? "-"}]`,
+          )
+          .join("");
+    } catch (diagErr) {
+      diag = `diag failed: ${diagErr instanceof Error ? diagErr.message : String(diagErr)}`;
+    }
+
+    toast.error(`Abonnieren fehlgeschlagen: ${detail}`, { description: diag, duration: 20000 });
   }
 
   return permission;
