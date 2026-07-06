@@ -57,9 +57,19 @@ async function postSubscription(subscription: PushSubscription): Promise<Respons
 }
 
 /**
+ * Guards the heal upsert so it hits the server at most once per app session. This survives the
+ * BadgeManager remounts caused by router.refresh() (visibilitychange, pull-to-refresh, …),
+ * which would otherwise re-POST on every foreground and flood the server log. The module stays
+ * loaded across those remounts; only a full page reload (new session) resets it.
+ */
+let subscriptionHealedThisSession = false;
+
+/**
  * Gesture-free heal: if the browser already holds a push subscription (granted earlier,
- * possibly lost server-side), re-upsert it. Does NOT call subscribe() – on iOS that
- * requires an active user gesture, so this only ever reuses an existing subscription.
+ * possibly lost server-side), re-upsert it – but only once per session (see the guard above).
+ * The local getSubscription() existence check runs every time so the UI stays correct; only the
+ * server POST is deduplicated. Does NOT call subscribe() – on iOS that requires an active user
+ * gesture, so this only ever reuses an existing subscription.
  * Returns whether THIS device currently holds a subscription.
  */
 async function healExistingSubscription(): Promise<boolean> {
@@ -67,9 +77,12 @@ async function healExistingSubscription(): Promise<boolean> {
   const subscription = await reg.pushManager.getSubscription();
   if (!subscription) return false;
 
+  if (subscriptionHealedThisSession) return true;
+
   try {
     const res = await postSubscription(subscription);
     if (!res.ok) console.error("[BadgeManager] subscription heal failed", res.status);
+    else subscriptionHealedThisSession = true;
   } catch (err) {
     console.error("[BadgeManager] subscription heal failed", err);
   }

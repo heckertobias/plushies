@@ -12,6 +12,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Per-build deployment id (git SHA) for Next.js skew protection. Baked into the client bundle at
+# build time, so it must be set before `next build`; no runtime env needed.
+ARG NEXT_DEPLOYMENT_ID
+ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
+
 RUN npm run build
 
 # Stage 3: Run

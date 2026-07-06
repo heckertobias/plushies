@@ -1,7 +1,26 @@
-/** Global guard so the scheduler isn't registered twice during Next.js dev hot-reloads. */
-const globalForScheduler = globalThis as unknown as { badgeSchedulerStarted?: boolean };
+/** Global guards so the scheduler / console patch aren't applied twice during dev hot-reloads. */
+const globalForScheduler = globalThis as unknown as {
+  badgeSchedulerStarted?: boolean;
+  consoleTimestampPatched?: boolean;
+};
 
 const BADGE_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
+
+/**
+ * Prefixes every server-side console line with an ISO timestamp so the docker logs show when
+ * things happen. Wraps the console methods once so it also covers Next.js-internal output (e.g.
+ * the "Failed to find Server Action" errors, which go through console.error).
+ */
+function patchConsoleWithTimestamps() {
+  if (globalForScheduler.consoleTimestampPatched) return;
+  globalForScheduler.consoleTimestampPatched = true;
+
+  const methods = ["log", "info", "warn", "error", "debug"] as const;
+  for (const method of methods) {
+    const original = console[method].bind(console);
+    console[method] = (...args: unknown[]) => original(`[${new Date().toISOString()}]`, ...args);
+  }
+}
 
 async function startBadgeScheduler() {
   if (globalForScheduler.badgeSchedulerStarted) return;
@@ -26,6 +45,8 @@ async function startBadgeScheduler() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    patchConsoleWithTimestamps();
+
     const { db } = await import("./lib/db");
     const { migrate } = await import("drizzle-orm/libsql/migrator");
     const { join } = await import("node:path");

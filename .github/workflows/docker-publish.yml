@@ -45,6 +45,8 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          build-args: |
+            NEXT_DEPLOYMENT_ID=${{ github.sha }}
           push: true
           outputs: type=image,name=ghcr.io/heckertobias/plushies,push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
