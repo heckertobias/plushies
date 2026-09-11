@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # npm dependencies. Minor/patch bumps are batched into one weekly PR; major
+  # bumps are not in the group, so each one arrives as its own PR and can't
+  # block the batch.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Dockerfile base image (node:*-alpine)
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  # GitHub Actions (keeps the SHA-pinned actions up to date)
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
