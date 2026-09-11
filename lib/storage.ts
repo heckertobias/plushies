@@ -2,7 +2,8 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp from "sharp";
 
-const UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(process.cwd(), "uploads");
+// turbopackIgnore: runtime data dir - keeps local uploads out of the traced standalone output.
+const UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(/* turbopackIgnore: true */ process.cwd(), "uploads");
 
 const MAX_DIMENSION = 1200;
 const WEBP_QUALITY = 80;

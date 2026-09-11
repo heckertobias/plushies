@@ -3,7 +3,8 @@ import { drizzle } from "drizzle-orm/libsql";
 import { join } from "node:path";
 import * as schema from "./schema";
 
-const DB_URL = process.env.DATABASE_URL ?? `file:${join(process.cwd(), "plushies.db")}`;
+// turbopackIgnore: local dev DB - keeps plushies.db out of the traced standalone output.
+const DB_URL = process.env.DATABASE_URL ?? `file:${join(/* turbopackIgnore: true */ process.cwd(), "plushies.db")}`;
 
 // Singleton to survive Next.js dev-mode hot reloads
 const globalForDb = globalThis as unknown as { db: ReturnType<typeof drizzle<typeof schema>> | undefined };

@@ -4,7 +4,7 @@ import { join, extname, resolve } from "node:path";
 
 export const dynamic = "force-dynamic";
 
-const UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(process.cwd(), "uploads");
+const UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(/* turbopackIgnore: true */ process.cwd(), "uploads");
 
 const MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -23,12 +23,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   }
   const filepath = resolve(UPLOADS_DIR, filename);
   // Guard against path traversal (e.g. ../../etc/passwd)
-  if (!filepath.startsWith(resolve(UPLOADS_DIR) + "/") && filepath !== resolve(UPLOADS_DIR)) {
+  // turbopackIgnore: UPLOADS_DIR is a runtime path outside the project; without the hint Turbopack
+  // can't scope this filesystem access and traces the whole project into the standalone output.
+  if (
+    !filepath.startsWith(resolve(/* turbopackIgnore: true */ UPLOADS_DIR) + "/") &&
+    filepath !== resolve(/* turbopackIgnore: true */ UPLOADS_DIR)
+  ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   try {
-    const buffer = await readFile(filepath);
+    const buffer = await readFile(/* turbopackIgnore: true */ filepath);
     const contentType = MIME[extname(filename).toLowerCase()] ?? "application/octet-stream";
     return new NextResponse(buffer, { headers: { "Content-Type": contentType } });
   } catch {
