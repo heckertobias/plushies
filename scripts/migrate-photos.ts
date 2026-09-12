@@ -6,6 +6,16 @@
  *   2. Create an optimized WebP next to it → update photoPath
  *
  * Run with: npx tsx scripts/migrate-photos.ts
+ *
+ * The runtime image does not ship this script or its dependencies (that copy cost ~608 MB), so on
+ * the server run it in a throwaway container against the same volumes - verified to work:
+ *
+ *   docker run --rm -v plushies_db:/data -v plushies_uploads:/uploads \
+ *     -v "$PWD/scripts:/work/scripts:ro" -v "$PWD/lib:/work/lib:ro" -w /work \
+ *     -e DATABASE_URL=file:/data/plushies.db -e UPLOADS_DIR=/uploads node:26-alpine \
+ *     sh -c 'npm i drizzle-orm @libsql/client sharp tsx && npx tsx scripts/migrate-photos.ts'
+ *
+ * Stop the app container first if the migration writes photos it also serves.
  */
 
 import { createClient } from "@libsql/client";

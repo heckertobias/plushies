@@ -39,10 +39,10 @@ COPY --from=builder /app/public ./public
 # Copy drizzle migrations (needed at runtime for auto-migrate)
 COPY --from=builder /app/drizzle ./drizzle
 
-# Copy scripts + lib + node_modules for manual maintenance tasks (e.g. migrate-photos)
-COPY --from=builder /app/scripts ./scripts
-COPY --from=builder /app/lib ./lib
-COPY --from=builder /app/node_modules ./node_modules
+# No scripts/, lib/ or full node_modules here on purpose: copying the build's node_modules added
+# ~608 MB (next, @next/swc, lucide-react, date-fns are runtime deps, so --omit=dev saves nothing).
+# The standalone output ships what the server needs. The one-off maintenance script is run in a
+# throwaway container instead - see the header of scripts/migrate-photos.ts.
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
