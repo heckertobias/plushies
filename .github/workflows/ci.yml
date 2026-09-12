@@ -33,6 +33,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Unit tests for the pure helpers in lib/ (no DOM, no database).
+      - name: Test
+        run: npm test
+
       # Same `next build` the Docker image runs; needs no env vars or database.
       - name: Build
         run: npm run build
