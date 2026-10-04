@@ -35,4 +35,20 @@ export async function verifySessionToken(token: string): Promise<boolean> {
   }
 }
 
+// Lax instead of Strict: with Strict the cookie is not sent when the app is opened from a link in
+// another app (Mail, Messenger, the notification click on iOS), so those openings landed on /login.
+// 400 days is the maximum browsers accept; the proxy renews it on every authenticated request, so
+// a device that opens the app at least once in that window stays logged in.
+const SESSION_MAX_AGE = 60 * 60 * 24 * 400;
+
+export function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.SECURE_COOKIE === "true",
+    sameSite: "lax" as const,
+    maxAge: SESSION_MAX_AGE,
+    path: "/",
+  };
+}
+
 export { COOKIE_NAME };

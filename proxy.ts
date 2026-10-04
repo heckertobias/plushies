@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySessionToken, COOKIE_NAME } from "@/lib/auth";
+import { verifySessionToken, sessionCookieOptions, COOKIE_NAME } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/", "/api/ical", "/sw.js"];
 
@@ -16,7 +16,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  return NextResponse.next();
+  // Sliding expiry: re-issue the cookie so it never runs out while the app is in use.
+  const response = NextResponse.next();
+  response.cookies.set(COOKIE_NAME, token, sessionCookieOptions());
+  return response;
 }
 
 // PWA assets stay public: the icon routes (app/icon.tsx, app/apple-icon.tsx) and the manifest are
